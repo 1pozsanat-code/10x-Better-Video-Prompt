@@ -868,3 +868,81 @@ button:disabled {
     background: rgba(255, 99, 132, 0.4);
     color: white;
 }
+
+/* New Image Analysis Styles */
+.image-analysis-card {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 25px;
+    border-left: 4px solid #7be8feb4; /* A different color to distinguish */
+}
+
+.analysis-section {
+    margin-bottom: 30px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.analysis-section h3, .prompt-suggestions-section h3 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #a7f5ff;
+}
+
+.analysis-description {
+    line-height: 1.6;
+    margin-bottom: 20px;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.analysis-details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (min-width: 600px) {
+    .analysis-details-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+.analysis-details-grid > div > strong {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.analysis-details-grid > div > p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.analysis-tags {
+    margin-top: 0 !important;
+}
+
+.color-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.color-chip {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #000; /* Dark text for contrast on light HSL colors */
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.prompt-suggestions-section .alt-prompt-card {
+    margin-bottom: 15px;
+}

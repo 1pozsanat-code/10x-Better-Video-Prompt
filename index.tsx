@@ -117,12 +117,15 @@ const videoPromptSchema = {
             type: Type.OBJECT,
             description: 'Lighting setup for the scene.',
             properties: {
-                type: { type: Type.STRING, description: 'Primary type of lighting.' },
-                quality: { type: Type.STRING, description: 'Quality of the light (e.g., "Hard shadows, high contrast").' },
-                color_temperature: { type: Type.STRING, description: 'Color tones of the light.' },
-                special_effects: { type: Type.STRING, description: 'Any special lighting effects.' },
+                type: { type: Type.STRING, description: 'Primary type of lighting (e.g., "Natural sunlight", "Studio lighting", "Neon glow").' },
+                quality: { type: Type.STRING, description: 'Quality of the light (e.g., "Hard shadows, high contrast", "Soft diffused light").' },
+                color_temperature: { type: Type.STRING, description: 'Color tones of the light (e.g., "Warm golden hour", "Cool blue tones").' },
+                key_light_source: { type: Type.STRING, description: 'The direction and nature of the main light source (e.g., "Top-down moonlight", "Side-lit from a window").' },
+                fill_light_intensity: { type: Type.STRING, description: 'The intensity of the fill light, which softens shadows (e.g., "Low", "Medium", "None").' },
+                backlight_effect: { type: Type.STRING, description: 'The effect of the backlight, which separates the subject from the background (e.g., "Rim lighting for a halo effect", "Silhouette", "None").' },
+                special_effects: { type: Type.STRING, description: 'Any other special lighting effects (e.g., "Lens flare", "God rays", "Flickering lights"). Can be "None".' },
             },
-            required: ['type', 'quality', 'color_temperature'],
+            required: ['type', 'quality', 'color_temperature', 'key_light_source', 'fill_light_intensity', 'backlight_effect'],
         },
         technical: {
             type: Type.OBJECT,
@@ -152,17 +155,42 @@ const videoPromptSchema = {
     required: ['meta', 'scene', 'cinematography', 'lighting', 'technical', 'tags'],
 };
 
-const alternativePromptsSchema = {
-    type: Type.ARRAY,
-    description: "An array of 3 distinct video prompt ideas.",
-    items: {
-        type: Type.OBJECT,
-        properties: {
-            title: { type: Type.STRING, description: "A short, creative title for the prompt idea." },
-            prompt: { type: Type.STRING, description: "The descriptive video prompt text." }
+const imageAnalysisSchema = {
+    type: Type.OBJECT,
+    properties: {
+        analysis: {
+            type: Type.OBJECT,
+            description: "A detailed analysis of the image content.",
+            properties: {
+                overall_description: { type: Type.STRING, description: "A rich, detailed paragraph describing the entire scene, including mood, atmosphere, and potential narrative." },
+                dominant_colors: {
+                    type: Type.ARRAY,
+                    description: "An array of 3-5 dominant or significant colors found in the image, described evocatively (e.g., 'Midnight Blue', 'Fiery Orange').",
+                    items: { type: Type.STRING }
+                },
+                identified_objects: {
+                    type: Type.ARRAY,
+                    description: "A list of key objects, characters, or elements identified in the image.",
+                    items: { type: Type.STRING }
+                },
+                composition_style: { type: Type.STRING, description: "A brief description of the image's composition or photographic style (e.g., 'Rule of thirds, shallow depth of field', 'Symmetrical, leading lines')." }
+            },
+            required: ["overall_description", "dominant_colors", "identified_objects"]
         },
-        required: ["title", "prompt"]
-    }
+        prompt_suggestions: {
+            type: Type.ARRAY,
+            description: "An array of 3 distinct video prompt ideas based on the detailed analysis.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING, description: "A short, creative title for the prompt idea." },
+                    prompt: { type: Type.STRING, description: "The descriptive video prompt text, incorporating details from the analysis." }
+                },
+                required: ["title", "prompt"]
+            }
+        }
+    },
+    required: ["analysis", "prompt_suggestions"]
 };
 
 const tiltedDescriptionsSchema = {
@@ -353,10 +381,94 @@ function displayEnhancedPrompt(promptData: any) {
     }
 }
 
-/** Displays the alternative prompts from image analysis */
-function displayAlternativePrompts(prompts: {title: string, prompt: string}[]) {
-    resultsContainer.innerHTML = '';
-    prompts.forEach(p => {
+/** Generates a color from a string for the color chips */
+function stringToHslColor(str: string, s = 60, l = 70) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = hash % 360;
+    return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+/** Displays the detailed image analysis results */
+function displayImageAnalysisResults(analysisData: any) {
+    resultsContainer.innerHTML = ''; // Clear previous results
+
+    // Main container card
+    const analysisCard = document.createElement('div');
+    analysisCard.className = 'image-analysis-card';
+
+    // --- Analysis Section ---
+    const analysisSection = document.createElement('div');
+    analysisSection.className = 'analysis-section';
+
+    const analysisHeader = document.createElement('h3');
+    analysisHeader.innerHTML = `<i class="fas fa-search"></i> Image Analysis`;
+    analysisSection.appendChild(analysisHeader);
+
+    // Description
+    const description = document.createElement('p');
+    description.className = 'analysis-description';
+    description.textContent = analysisData.analysis.overall_description;
+    analysisSection.appendChild(description);
+
+    // Details Grid (Colors, Objects, Style)
+    const detailsGrid = document.createElement('div');
+    detailsGrid.className = 'analysis-details-grid';
+
+    // Identified Objects
+    if (analysisData.analysis.identified_objects?.length > 0) {
+        const objectsContainer = document.createElement('div');
+        objectsContainer.innerHTML = `<strong>Identified Elements:</strong>`;
+        const tagsContainer = document.createElement('div');
+        tagsContainer.className = 'tags-container analysis-tags';
+        analysisData.analysis.identified_objects.forEach((obj: string) => {
+            const tagEl = document.createElement('span');
+            tagEl.className = 'tag';
+            tagEl.textContent = obj;
+            tagsContainer.appendChild(tagEl);
+        });
+        objectsContainer.appendChild(tagsContainer);
+        detailsGrid.appendChild(objectsContainer);
+    }
+    
+    // Dominant Colors
+    if (analysisData.analysis.dominant_colors?.length > 0) {
+        const colorsContainer = document.createElement('div');
+        colorsContainer.innerHTML = `<strong>Dominant Colors:</strong>`;
+        const paletteContainer = document.createElement('div');
+        paletteContainer.className = 'color-palette';
+        analysisData.analysis.dominant_colors.forEach((colorName: string) => {
+             const colorEl = document.createElement('span');
+             colorEl.className = 'color-chip';
+             colorEl.style.backgroundColor = stringToHslColor(colorName);
+             colorEl.textContent = colorName;
+             paletteContainer.appendChild(colorEl);
+        });
+        colorsContainer.appendChild(paletteContainer);
+        detailsGrid.appendChild(colorsContainer);
+    }
+
+    // Composition Style
+    if (analysisData.analysis.composition_style) {
+        const compositionContainer = document.createElement('div');
+        compositionContainer.innerHTML = `<strong>Composition:</strong> <p>${analysisData.analysis.composition_style}</p>`;
+        detailsGrid.appendChild(compositionContainer);
+    }
+
+    analysisSection.appendChild(detailsGrid);
+    analysisCard.appendChild(analysisSection);
+
+    // --- Prompt Suggestions Section ---
+    const promptsSection = document.createElement('div');
+    promptsSection.className = 'prompt-suggestions-section';
+
+    const promptsHeader = document.createElement('h3');
+    promptsHeader.innerHTML = `<i class="fas fa-lightbulb"></i> Prompt Suggestions`;
+    promptsSection.appendChild(promptsHeader);
+
+    analysisData.prompt_suggestions.forEach((p: {title: string, prompt: string}) => {
         const card = document.createElement('div');
         card.className = 'alt-prompt-card';
 
@@ -377,8 +489,11 @@ function displayAlternativePrompts(prompts: {title: string, prompt: string}[]) {
         card.appendChild(title);
         card.appendChild(promptText);
         card.appendChild(useBtn);
-        resultsContainer.appendChild(card);
+        promptsSection.appendChild(card);
     });
+
+    analysisCard.appendChild(promptsSection);
+    resultsContainer.appendChild(analysisCard);
 }
 
 
@@ -729,7 +844,7 @@ async function handleAnalyzeImage() {
     };
 
     const textPart = {
-        text: "Analyze this image carefully. Based on its content, mood, and potential stories, generate 3 distinct and creative video prompt ideas. The user wants to create a short video inspired by this image. For each idea, provide a short, catchy title and a descriptive prompt text. Follow the provided JSON schema."
+        text: `Analyze this image in detail. First, provide a thorough analysis including an overall description, a list of dominant colors, identified objects/elements, and the composition style. Then, based on this analysis, generate 3 distinct and creative video prompt suggestions. The final output must be a single JSON object that strictly follows the provided schema.`
     };
 
     try {
@@ -738,12 +853,12 @@ async function handleAnalyzeImage() {
             contents: { parts: [imagePart, textPart] },
             config: {
                 responseMimeType: "application/json",
-                responseSchema: alternativePromptsSchema,
+                responseSchema: imageAnalysisSchema,
             },
         });
         
-        const alternativePrompts = JSON.parse(response.text);
-        displayAlternativePrompts(alternativePrompts);
+        const analysisResults = JSON.parse(response.text);
+        displayImageAnalysisResults(analysisResults);
     } catch (error) {
         console.error('Error analyzing image:', error);
         resultsContainer.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Sorry, failed to analyze the image. Please try a different one.</div>`;
