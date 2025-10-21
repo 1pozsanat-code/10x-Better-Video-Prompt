@@ -697,7 +697,7 @@ button:disabled {
 }
 
 .style-preset-visual {
-    height: 60px;
+    min-height: 70px;
     border-radius: 4px;
     margin-bottom: 12px;
     background-color: rgba(0, 0, 0, 0.2);
@@ -705,22 +705,40 @@ button:disabled {
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: center;
-    padding: 8px;
-    text-align: center;
+    padding: 10px;
+    text-align: left;
 }
 
 .placeholder-text {
     font-size: 1.5rem;
     color: rgba(255, 255, 255, 0.5);
+    width: 100%;
+    text-align: center;
 }
 
-.style-visual-description, .style-visual-description-fallback {
+.style-visual-description {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 0.85rem;
-    line-height: 1.5;
+    font-size: 0.8rem;
+    line-height: 1.4;
     color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.style-visual-key-elements {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+}
+
+.style-visual-key-elements strong {
+    font-weight: 600;
+    color: #ffc19a;
+    margin-right: 4px;
 }
 
 .style-presets {

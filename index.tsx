@@ -45,6 +45,7 @@ let chat: Chat;
 let currentEnhancedPrompt: object | null = null;
 let uploadedImageBase64: { mimeType: string, data: string } | null = null;
 let selectedStylePreset: string | null = null;
+let styleDescriptionsCache: any | null = null;
 const SAVED_PROMPTS_KEY = 'ai-video-prompts';
 
 // NEW Viewfinder state
@@ -232,10 +233,38 @@ const negativePromptAnalysisSchema = {
 const styleVisualsSchema = {
     type: Type.OBJECT,
     properties: {
-        cinematic: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Cinematic style." },
-        anime: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Anime style." },
-        photorealistic: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Photorealistic style." },
-        abstract: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Abstract style." }
+        cinematic: {
+            type: Type.OBJECT,
+            properties: {
+                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
+                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks (e.g., 'Dramatic lighting, film grain, shallow depth of field')." }
+            },
+            required: ["description", "key_elements"]
+        },
+        anime: {
+            type: Type.OBJECT,
+            properties: {
+                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
+                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks." }
+            },
+            required: ["description", "key_elements"]
+        },
+        photorealistic: {
+            type: Type.OBJECT,
+            properties: {
+                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
+                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks." }
+            },
+            required: ["description", "key_elements"]
+        },
+        abstract: {
+            type: Type.OBJECT,
+            properties: {
+                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
+                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks." }
+            },
+            required: ["description", "key_elements"]
+        }
     },
     required: ["cinematic", "anime", "photorealistic", "abstract"]
 };
@@ -708,7 +737,7 @@ async function generateAndDisplayExamplePrompts() {
     });
 
     try {
-        const prompt = `Generate a short, evocative description (under 20 words) of the key visual characteristics for each of the following styles. Focus on visual elements like lighting, color, texture, and composition. Return a JSON object with keys 'cinematic', 'anime', 'photorealistic', 'abstract' where each value is the description string.`;
+        const prompt = `For each of the following video styles (cinematic, anime, photorealistic, abstract), provide a detailed JSON object. Each object must contain a 'description' (a short, evocative, one-sentence summary of the style's feeling) and 'key_elements' (a comma-separated string of 3-4 defining visual characteristics, like lighting, texture, or composition styles).`;
 
         const response = await ai.models.generateContent({
             model: chatModel,
@@ -720,21 +749,38 @@ async function generateAndDisplayExamplePrompts() {
         });
 
         const descriptions = JSON.parse(response.text);
+        styleDescriptionsCache = descriptions; // Cache the results
 
-        Object.entries(descriptions).forEach(([key, value]) => {
+        Object.entries(descriptions).forEach(([key, value]: [string, any]) => {
             const container = visualContainers[key as keyof typeof visualContainers];
             if (container) {
-                container.innerHTML = `<p class="style-visual-description">${value}</p>`;
+                container.innerHTML = `
+                    <p class="style-visual-description">${value.description}</p>
+                    <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${value.key_elements}</div>
+                `;
             }
         });
 
     } catch (error) {
         console.error("Error generating style example prompts:", error);
-        // Fallback to simple text if API fails
-        if (visualContainers.cinematic) visualContainers.cinematic.innerHTML = `<p class="style-visual-description-fallback">High contrast, dramatic lighting, film grain.</p>`;
-        if (visualContainers.anime) visualContainers.anime.innerHTML = `<p class="style-visual-description-fallback">Vibrant colors, cel-shaded characters, dynamic lines.</p>`;
-        if (visualContainers.photorealistic) visualContainers.photorealistic.innerHTML = `<p class="style-visual-description-fallback">Lifelike textures, accurate lighting, realistic detail.</p>`;
-        if (visualContainers.abstract) visualContainers.abstract.innerHTML = `<p class="style-visual-description-fallback">Geometric shapes, bold color fields, non-representational forms.</p>`;
+        // Fallback to detailed static text if API fails
+        const fallbackData = {
+            cinematic: { description: "High contrast, dramatic lighting, and film grain.", key_elements: "Shallow depth of field, anamorphic lens flare, moody color grading" },
+            anime: { description: "Vibrant colors, cel-shaded characters, and dynamic lines.", key_elements: "Bold outlines, expressive faces, speed lines, detailed backgrounds" },
+            photorealistic: { description: "Lifelike textures, accurate lighting, and realistic detail.", key_elements: "Natural lighting, ray-traced reflections, complex materials, physics-based motion" },
+            abstract: { description: "Geometric shapes, bold color fields, and non-representational forms.", key_elements: "Textural overlays, fluid motion, particle systems, symbolic imagery" }
+        };
+        styleDescriptionsCache = fallbackData; // Cache fallback data
+
+        Object.entries(fallbackData).forEach(([key, value]) => {
+            const container = visualContainers[key as keyof typeof visualContainers];
+            if (container) {
+                 container.innerHTML = `
+                    <p class="style-visual-description">${value.description}</p>
+                    <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${value.key_elements}</div>
+                `;
+            }
+        });
     }
 }
 
@@ -765,12 +811,29 @@ async function handleGeneratePrompt() {
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
-    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. If a style preset is provided, ensure the 'meta.style' field in the JSON reflects this style and that other fields (like lighting, color_grading, cinematography, etc.) are influenced by it to create a cohesive result. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', provide an array of objects, each defining a 'shot_type' (e.g., 'Establishing Shot', 'Wide Shot', 'Close-up', 'Low-Angle Shot') and a 'description' of what happens in that shot. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. If the user provides exclusion criteria, populate the `meta.negative_prompt` field with a summary of these exclusions and ensure the rest of the generated prompt avoids these concepts. If no exclusions are given, set `meta.negative_prompt` to \"none\". Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
+    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. When a style preset is provided with detailed visual characteristics, it is crucial that you use this information to heavily influence all relevant fields of the JSON output, especially 'lighting', 'color_grading', and 'cinematography', to create a cohesive result that perfectly matches the requested style. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', provide an array of objects, each defining a 'shot_type' (e.g., 'Establishing Shot', 'Wide Shot', 'Close-up', 'Low-Angle Shot') and a 'description' of what happens in that shot. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. If the user provides exclusion criteria, populate the `meta.negative_prompt` field with a summary of these exclusions and ensure the rest of the generated prompt avoids these concepts. If no exclusions are given, set `meta.negative_prompt` to \"none\". Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
     
     let finalPrompt = `User idea: "${basicPrompt}"`;
-    if (selectedStylePreset) {
-        finalPrompt = `Apply the following style preset: "${selectedStylePreset}".\n\n${finalPrompt}`;
+    
+    if (selectedStylePreset && styleDescriptionsCache) {
+        const styleKey = selectedStylePreset.toLowerCase();
+        const styleDetails = styleDescriptionsCache[styleKey];
+        if (styleDetails) {
+            const styleContext = `
+---
+STYLE CONTEXT TO APPLY:
+- Style Name: "${selectedStylePreset}"
+- Description: "${styleDetails.description}"
+- Key Visual Elements to incorporate: "${styleDetails.key_elements}"
+---
+`;
+            finalPrompt = `${styleContext}\n\n${finalPrompt}`;
+        } else {
+            // Fallback if cache is not populated correctly
+            finalPrompt = `Apply the following style preset: "${selectedStylePreset}".\n\n${finalPrompt}`;
+        }
     }
+
     if (negativePrompt) {
         finalPrompt += `\n\nExclusion Criteria (things to avoid): "${negativePrompt}"`;
     }
