@@ -66,8 +66,21 @@ const videoPromptSchema = {
             properties: {
                 shot_sequence: {
                     type: Type.ARRAY,
-                    description: 'A sequence of 3-5 key shots describing the scene. Use specific cinematic terms like "establishing shot", "close-up", "low-angle shot", "tracking shot", "point-of-view (POV) shot".',
-                    items: { type: Type.STRING },
+                    description: 'A sequence of 3-5 key shots describing the scene. For each shot, specify the type and a brief description.',
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            shot_type: {
+                                type: Type.STRING,
+                                description: 'The type of camera shot (e.g., "Establishing Shot", "Wide Shot", "Medium Shot", "Close-up", "Low-Angle Shot", "POV Shot").'
+                            },
+                            description: {
+                                type: Type.STRING,
+                                description: 'A brief description of the action or composition within this shot.'
+                            }
+                        },
+                        required: ['shot_type', 'description']
+                    }
                 },
                 camera_movement: { type: Type.STRING, description: 'Description of camera movements. Use specific cinematic terms like "dolly zoom", "crane shot", "whip pan", "dutch angle", "steadicam", "handheld shaky cam".' },
                 framing: { type: Type.STRING, description: 'Framing and composition notes.' },
@@ -449,7 +462,7 @@ async function handleGeneratePrompt() {
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
-    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. If a style preset is provided, ensure the 'meta.style' field in the JSON reflects this style and that other fields (like lighting, color_grading, cinematography, etc.) are influenced by it to create a cohesive result. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', suggest angles like 'establishing shot', 'low-angle shot', 'overhead shot', 'dutch angle'. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
+    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. If a style preset is provided, ensure the 'meta.style' field in the JSON reflects this style and that other fields (like lighting, color_grading, cinematography, etc.) are influenced by it to create a cohesive result. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', provide an array of objects, each defining a 'shot_type' (e.g., 'Establishing Shot', 'Wide Shot', 'Close-up', 'Low-Angle Shot') and a 'description' of what happens in that shot. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
     
     let finalPrompt = `User idea: "${basicPrompt}"`;
     if (selectedStylePreset) {
@@ -638,10 +651,95 @@ function renderSavedPrompts() {
     });
 }
 
+/** Loads a saved prompt into the results view */
+function handleLoadPrompt(promptId: number) {
+    const prompts = getSavedPrompts();
+    const promptToLoad = prompts.find(p => p.id === promptId);
+    if (promptToLoad) {
+        displayEnhancedPrompt(promptToLoad.data);
+        promptInput.value = ''; // Clear input as we've loaded a prompt
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        showNotification('Prompt loaded successfully!');
+    } else {
+        console.error('Could not find prompt with id:', promptId);
+        showNotification('Error: Could not load prompt.');
+    }
+}
 
-// 7. Event listeners
-generateBtn.addEventListener('click', handleGeneratePrompt);
-sendChatBtn.addEventListener('click', handleSendMessage);
-chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleSendMessage
+/** Deletes a prompt from localStorage */
+function handleDeletePrompt(promptId: number) {
+    if (!confirm('Are you sure you want to delete this prompt?')) {
+        return;
+    }
+    let prompts = getSavedPrompts();
+    prompts = prompts.filter(p => p.id !== promptId);
+    savePrompts(prompts);
+    renderSavedPrompts();
+    showNotification('Prompt deleted.');
+}
+
+
+// 7. Event listeners & Initialization
+function init() {
+    generateBtn.addEventListener('click', handleGeneratePrompt);
+    sendChatBtn.addEventListener('click', handleSendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleSendMessage();
+        }
+    });
+    generateVideoBtn.addEventListener('click', handleGenerateVideo);
+    imageUploadInput.addEventListener('change', handleImageUpload);
+    analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
+
+    // Saved prompts event delegation
+    savedPromptsContainer.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const loadBtn = target.closest('.load-btn');
+        const deleteBtn = target.closest('.delete-btn');
+
+        if (loadBtn) {
+            const promptId = parseInt(loadBtn.getAttribute('data-id')!, 10);
+            handleLoadPrompt(promptId);
+        }
+
+        if (deleteBtn) {
+            const promptId = parseInt(deleteBtn.getAttribute('data-id')!, 10);
+            handleDeletePrompt(promptId);
+        }
+    });
+    
+    // Initialize chat
+    chat = ai.chats.create({
+        model: chatModel,
+        config: {
+            systemInstruction: 'You are a friendly and helpful AI assistant specializing in video prompt engineering. Help the user refine their ideas and understand the generated prompts.',
+        },
+    });
+
+    // Style preset button logic
+    stylePresetsContainer.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const button = target.closest('.style-preset-btn');
+        if (button) {
+            const style = button.getAttribute('data-style');
+            const currentActive = stylePresetsContainer.querySelector('.active');
+            
+            if (currentActive) {
+                currentActive.classList.remove('active');
+            }
+            
+            if (selectedStylePreset === style) {
+                selectedStylePreset = null;
+            } else {
+                button.classList.add('active');
+                selectedStylePreset = style;
+            }
+        }
+    });
+
+    // Initial render of saved prompts
+    renderSavedPrompts();
+}
+
+init();
