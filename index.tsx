@@ -7,6 +7,7 @@ const chatModel = 'gemini-2.5-flash'; // Using a faster model for chat, summariz
 
 // 2. DOM element selectors
 const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
+const negativePromptInput = document.getElementById('negative-prompt') as HTMLTextAreaElement;
 const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
 const resultsContainer = document.getElementById('results-container');
 const copyNotification = document.getElementById('copy-notification');
@@ -62,6 +63,10 @@ const videoPromptSchema = {
                 aspect_ratio: { type: Type.STRING, description: 'Aspect ratio (e.g., "16:9", "21:9").' },
                 duration: { type: Type.STRING, description: 'Target duration (e.g., "30s").' },
                 mood: { type: Type.STRING, description: 'The emotional tone of the video.' },
+                negative_prompt: { 
+                    type: Type.STRING, 
+                    description: 'A concise summary of elements, styles, or concepts to explicitly exclude from the video. Can be "none" if no exclusions are provided.' 
+                },
             },
             required: ['style', 'aspect_ratio', 'duration', 'mood'],
         },
@@ -253,6 +258,18 @@ function displayEnhancedPrompt(promptData: any) {
     simpleTextContent.className = 'prompt-content simple-text-content placeholder';
     simpleTextContent.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating simplified text...`;
     
+    // --- Exclusions Section ---
+    const exclusionsContainer = document.createElement('div');
+    exclusionsContainer.className = 'exclusions-container';
+    if (promptData.meta?.negative_prompt && promptData.meta.negative_prompt.toLowerCase() !== 'none') {
+        const strong = document.createElement('strong');
+        strong.innerHTML = '<i class="fas fa-ban"></i> Exclusions: ';
+        exclusionsContainer.appendChild(strong);
+        const exclusionText = document.createElement('span');
+        exclusionText.textContent = promptData.meta.negative_prompt;
+        exclusionsContainer.appendChild(exclusionText);
+    }
+
     // --- Tags Section ---
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'tags-container';
@@ -273,6 +290,9 @@ function displayEnhancedPrompt(promptData: any) {
     promptCard.appendChild(jsonContent);
     promptCard.appendChild(simpleTextHeader);
     promptCard.appendChild(simpleTextContent);
+    if (exclusionsContainer.hasChildNodes()) {
+        promptCard.appendChild(exclusionsContainer);
+    }
     promptCard.appendChild(tagsContainer);
     
     resultsContainer.appendChild(promptCard);
@@ -341,10 +361,14 @@ function displayAlternativePrompts(prompts: {title: string, prompt: string}[]) {
 /** Generates and populates the simplified text prompt */
 async function generateSimplePrompt(promptData: any, contentElement: HTMLElement, buttonElement: HTMLButtonElement) {
     try {
-        const generationPrompt = `Based on the following detailed JSON video prompt, create a concise, human-readable, single-paragraph text prompt for an AI video generation model. Focus on the most critical visual elements, actions, atmosphere, and cinematic style. The output must be under 1000 characters and should be plain text only, without any titles, markdown, or explanations.
+        let generationPrompt = `Based on the following detailed JSON video prompt, create a concise, human-readable, single-paragraph text prompt for an AI video generation model. Focus on the most critical visual elements, actions, atmosphere, and cinematic style. The output must be under 1000 characters and should be plain text only, without any titles, markdown, or explanations.
 
 JSON Prompt:
 ${JSON.stringify(promptData, null, 2)}`;
+
+        if (promptData.meta?.negative_prompt && promptData.meta.negative_prompt.toLowerCase() !== 'none') {
+            generationPrompt += `\n\nImportant: The final prompt must also incorporate the following exclusions: ${promptData.meta.negative_prompt}`;
+        }
 
         const response = await ai.models.generateContent({
             model: chatModel, // Use the faster model for this task
@@ -550,6 +574,8 @@ function updateTiltDescriptions(descriptions: any) {
 /** Handles the prompt generation from text */
 async function handleGeneratePrompt() {
     const basicPrompt = promptInput.value.trim();
+    const negativePrompt = negativePromptInput.value.trim();
+
     if (!basicPrompt) {
         alert('Please enter a video idea first.');
         return;
@@ -569,11 +595,14 @@ async function handleGeneratePrompt() {
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
-    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. If a style preset is provided, ensure the 'meta.style' field in the JSON reflects this style and that other fields (like lighting, color_grading, cinematography, etc.) are influenced by it to create a cohesive result. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', provide an array of objects, each defining a 'shot_type' (e.g., 'Establishing Shot', 'Wide Shot', 'Close-up', 'Low-Angle Shot') and a 'description' of what happens in that shot. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
+    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. If a style preset is provided, ensure the 'meta.style' field in the JSON reflects this style and that other fields (like lighting, color_grading, cinematography, etc.) are influenced by it to create a cohesive result. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', provide an array of objects, each defining a 'shot_type' (e.g., 'Establishing Shot', 'Wide Shot', 'Close-up', 'Low-Angle Shot') and a 'description' of what happens in that shot. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. If the user provides exclusion criteria, populate the `meta.negative_prompt` field with a summary of these exclusions and ensure the rest of the generated prompt avoids these concepts. If no exclusions are given, set `meta.negative_prompt` to \"none\". Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
     
     let finalPrompt = `User idea: "${basicPrompt}"`;
     if (selectedStylePreset) {
         finalPrompt = `Apply the following style preset: "${selectedStylePreset}".\n\n${finalPrompt}`;
+    }
+    if (negativePrompt) {
+        finalPrompt += `\n\nExclusion Criteria (things to avoid): "${negativePrompt}"`;
     }
 
     try {

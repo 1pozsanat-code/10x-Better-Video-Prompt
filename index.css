@@ -97,6 +97,10 @@ textarea {
     min-height: 120px;
 }
 
+#negative-prompt {
+    min-height: 60px;
+}
+
 textarea:focus {
     outline: none;
     border-color: #ff7e5f;
@@ -265,6 +269,24 @@ button:disabled {
     white-space: pre-wrap;
     line-height: 1.6;
     max-height: 200px;
+}
+
+.exclusions-container {
+    margin-top: 15px;
+    padding: 10px 15px;
+    background: rgba(255, 99, 132, 0.1);
+    border-left: 3px solid #ff6384;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.exclusions-container strong {
+    color: #ffcdd2;
+    font-weight: 600;
+}
+
+.exclusions-container i {
+    margin-right: 8px;
 }
 
 .tags-container {
