@@ -90,7 +90,7 @@ textarea:focus {
     border-color: #ff7e5f;
 }
 
-button {
+button, .button-like {
     background: linear-gradient(to right, #ff7e5f, #feb47b);
     color: white;
     border: none;
@@ -104,9 +104,10 @@ button {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    text-align: center;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled), .button-like:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 126, 95, 0.4);
 }
@@ -117,12 +118,82 @@ button:disabled {
     opacity: 0.7;
 }
 
+.divider {
+    border: none;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.2);
+    margin: 30px 0;
+}
+
+.image-upload-container {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+#image-preview-container {
+    width: 100%;
+    height: 200px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: rgba(0,0,0,0.2);
+}
+
+#image-preview {
+    max-width: 100%;
+    max-height: 100%;
+    display: none;
+}
+
+#image-placeholder {
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+}
+
+#image-placeholder i {
+    font-size: 3rem;
+    margin-bottom: 10px;
+}
+
+.image-upload-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+}
+.image-upload-actions > * {
+    flex: 1;
+}
+
 .prompt-card {
     background: rgba(0, 0, 0, 0.3);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 20px;
     border-left: 4px solid #ff7e5f;
+}
+
+.alt-prompt-card {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #7be8feb4;
+}
+
+.alt-prompt-card h3 {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    background: linear-gradient(to right, #7be8fe, #8ee7a2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.alt-prompt-card p {
+    margin-bottom: 15px;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .prompt-header {

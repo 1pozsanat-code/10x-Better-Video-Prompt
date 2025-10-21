@@ -3,7 +3,7 @@ import { GoogleGenAI, Chat, Type } from "@google/genai";
 // 1. Initialize the Gemini AI Model
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const model = 'gemini-2.5-pro'; // Using a powerful model for complex JSON generation
-const chatModel = 'gemini-2.5-flash'; // Using a faster model for chat and summarization
+const chatModel = 'gemini-2.5-flash'; // Using a faster model for chat, summarization, and image analysis
 
 // 2. DOM element selectors
 const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
@@ -17,9 +17,17 @@ const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLBu
 const videoPreview = document.querySelector('.video-preview');
 const sceneVisualizationContainer = document.getElementById('scene-visualization');
 
+// Image Upload Elements
+const imageUploadInput = document.getElementById('image-upload-input') as HTMLInputElement;
+const imagePreview = document.getElementById('image-preview') as HTMLImageElement;
+const imagePlaceholder = document.getElementById('image-placeholder');
+const analyzeImageBtn = document.getElementById('analyze-image-btn') as HTMLButtonElement;
+
+
 // 3. State variables
 let chat: Chat;
 let currentEnhancedPrompt: object | null = null;
+let uploadedImageBase64: { mimeType: string, data: string } | null = null;
 
 // JSON schema for the enhanced prompt
 const videoPromptSchema = {
@@ -53,10 +61,10 @@ const videoPromptSchema = {
             properties: {
                 shot_sequence: {
                     type: Type.ARRAY,
-                    description: 'A sequence of 3-5 key shots describing the scene.',
+                    description: 'A sequence of 3-5 key shots describing the scene. Use specific cinematic terms like "establishing shot", "close-up", "low-angle shot", "tracking shot", "point-of-view (POV) shot".',
                     items: { type: Type.STRING },
                 },
-                camera_movement: { type: Type.STRING, description: 'Description of camera movements.' },
+                camera_movement: { type: Type.STRING, description: 'Description of camera movements. Use specific cinematic terms like "dolly zoom", "crane shot", "whip pan", "dutch angle", "steadicam", "handheld shaky cam".' },
                 framing: { type: Type.STRING, description: 'Framing and composition notes.' },
                 depth_of_field: { type: Type.STRING, description: 'Notes on depth of field and focus.' },
             },
@@ -99,6 +107,19 @@ const videoPromptSchema = {
         }
     },
     required: ['meta', 'scene', 'cinematography', 'lighting', 'technical', 'tags'],
+};
+
+const alternativePromptsSchema = {
+    type: Type.ARRAY,
+    description: "An array of 3 distinct video prompt ideas.",
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            title: { type: Type.STRING, description: "A short, creative title for the prompt idea." },
+            prompt: { type: Type.STRING, description: "The descriptive video prompt text." }
+        },
+        required: ["title", "prompt"]
+    }
 };
 
 
@@ -203,6 +224,34 @@ function displayEnhancedPrompt(promptData: any) {
     updateSceneVisualization(promptData.scene);
 }
 
+/** Displays the alternative prompts from image analysis */
+function displayAlternativePrompts(prompts: {title: string, prompt: string}[]) {
+    resultsContainer.innerHTML = '';
+    prompts.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'alt-prompt-card';
+
+        const title = document.createElement('h3');
+        title.textContent = p.title;
+
+        const promptText = document.createElement('p');
+        promptText.textContent = p.prompt;
+        
+        const useBtn = document.createElement('button');
+        useBtn.innerHTML = `<i class="fas fa-check-circle"></i> Use This Prompt`;
+        useBtn.onclick = () => {
+            promptInput.value = p.prompt;
+            promptInput.focus();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        card.appendChild(title);
+        card.appendChild(promptText);
+        card.appendChild(useBtn);
+        resultsContainer.appendChild(card);
+    });
+}
+
 
 /** Generates and populates the simplified text prompt */
 async function generateSimplePrompt(promptData: any, contentElement: HTMLElement, buttonElement: HTMLButtonElement) {
@@ -276,7 +325,7 @@ function updateSceneVisualization(scene: any) {
 
 // 5. Core logic functions
 
-/** Handles the prompt generation */
+/** Handles the prompt generation from text */
 async function handleGeneratePrompt() {
     const basicPrompt = promptInput.value.trim();
     if (!basicPrompt) {
@@ -286,18 +335,19 @@ async function handleGeneratePrompt() {
 
     generateBtn.disabled = true;
     generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing...';
-    resultsContainer.innerHTML = '<div class="placeholder">Generating your enhanced prompt...</div>';
+    resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Generating your enhanced prompt...</div>';
     sceneVisualizationContainer.innerHTML = '';
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
-    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
+    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', suggest angles like 'establishing shot', 'low-angle shot', 'overhead shot', 'dutch angle'. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
     
     try {
         const response = await ai.models.generateContent({
             model: model,
-            contents: `${systemInstruction}\n\nUser idea: "${basicPrompt}"`,
+            contents: `User idea: "${basicPrompt}"`,
             config: {
+                systemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: videoPromptSchema,
             },
@@ -314,6 +364,77 @@ async function handleGeneratePrompt() {
         generateBtn.innerHTML = '<i class="fas fa-magic"></i> Enhance Prompt (10X)';
     }
 }
+
+/** Handles image file selection and preview */
+function handleImageUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+
+    if (file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            imagePreview.src = result;
+            imagePreview.style.display = 'block';
+            imagePlaceholder.style.display = 'none';
+            analyzeImageBtn.disabled = false;
+
+            // Store base64 data
+            const [header, base64] = result.split(',');
+            uploadedImageBase64 = {
+                mimeType: file.type,
+                data: base64
+            };
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+/** Handles prompt generation from an image */
+async function handleAnalyzeImage() {
+    if (!uploadedImageBase64) {
+        alert('Please upload an image first.');
+        return;
+    }
+
+    analyzeImageBtn.disabled = true;
+    analyzeImageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing image and generating prompts...</div>';
+
+    const imagePart = {
+        inlineData: uploadedImageBase64
+    };
+
+    const textPart = {
+        text: "Analyze this image carefully. Based on its content, mood, and potential stories, generate 3 distinct and creative video prompt ideas. The user wants to create a short video inspired by this image. For each idea, provide a short, catchy title and a descriptive prompt text. Follow the provided JSON schema."
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: chatModel, // Flash model is great for multimodal tasks
+            contents: { parts: [imagePart, textPart] },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: alternativePromptsSchema,
+            },
+        });
+        
+        const alternativePrompts = JSON.parse(response.text);
+        displayAlternativePrompts(alternativePrompts);
+    } catch (error) {
+        console.error('Error analyzing image:', error);
+        resultsContainer.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Sorry, failed to analyze the image. Please try a different one.</div>`;
+    } finally {
+        analyzeImageBtn.disabled = false;
+        analyzeImageBtn.innerHTML = '<i class="fas fa-cogs"></i> Analyze Image';
+    }
+}
+
 
 /** Handles sending a chat message */
 async function handleSendMessage() {
@@ -372,6 +493,8 @@ chatInput.addEventListener('keypress', (e) => {
     }
 });
 generateVideoBtn.addEventListener('click', handleGenerateVideo);
+imageUploadInput.addEventListener('change', handleImageUpload);
+analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
 
 
 // 7. Initialization logic

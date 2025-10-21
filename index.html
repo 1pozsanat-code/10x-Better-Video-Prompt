@@ -26,12 +26,34 @@
                 <h2 class="section-title"><i class="fas fa-pencil-alt"></i> Enter Your Basic Prompt</h2>
                 <div class="form-group">
                     <label for="prompt">Describe your video idea</label>
-                    <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night...">A woman in futuristic clothing rides a futuristic scooter, escaping from creatures chasing her through the dusty deserts of an alien planet. Everything is covered in dust and smoke.</textarea>
+                    <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night..."></textarea>
                 </div>
                 <button id="generate-btn">
                     <i class="fas fa-magic"></i> Enhance Prompt (10X)
                 </button>
                 
+                <hr class="divider">
+
+                <h2 class="section-title"><i class="fas fa-image"></i> Generate From Image</h2>
+                <div class="image-upload-container">
+                    <div id="image-preview-container">
+                        <img id="image-preview" src="" alt="Image Preview">
+                        <span id="image-placeholder">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Upload an image</p>
+                        </span>
+                    </div>
+                    <input type="file" id="image-upload-input" accept="image/*" style="display: none;">
+                    <div class="image-upload-actions">
+                         <label for="image-upload-input" class="button-like">
+                            <i class="fas fa-folder-open"></i> Choose Image
+                        </label>
+                        <button id="analyze-image-btn" disabled>
+                            <i class="fas fa-cogs"></i> Analyze Image
+                        </button>
+                    </div>
+                </div>
+
                 <div class="scene-visualization" id="scene-visualization">
                     <!-- Scene elements will be dynamically generated here -->
                 </div>
