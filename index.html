@@ -32,6 +32,23 @@
                     <label for="prompt">Describe your video idea</label>
                     <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label>Choose a Style (Optional)</label>
+                    <div class="style-presets" id="style-presets">
+                        <button class="style-preset-btn" data-style="Cinematic">
+                            <i class="fas fa-film"></i> Cinematic
+                        </button>
+                        <button class="style-preset-btn" data-style="Anime">
+                            <i class="fas fa-paint-brush"></i> Anime
+                        </button>
+                        <button class="style-preset-btn" data-style="Photorealistic">
+                            <i class="fas fa-camera"></i> Photorealistic
+                        </button>
+                        <button class="style-preset-btn" data-style="Abstract">
+                            <i class="fas fa-atom"></i> Abstract
+                        </button>
+                    </div>
+                </div>
                 <button id="generate-btn">
                     <i class="fas fa-magic"></i> Enhance Prompt (10X)
                 </button>

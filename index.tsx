@@ -16,6 +16,7 @@ const chatMessagesContainer = document.getElementById('chat-messages');
 const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLButtonElement;
 const videoPreview = document.querySelector('.video-preview');
 const sceneVisualizationContainer = document.getElementById('scene-visualization');
+const stylePresetsContainer = document.getElementById('style-presets');
 
 // Image Upload Elements
 const imageUploadInput = document.getElementById('image-upload-input') as HTMLInputElement;
@@ -28,6 +29,7 @@ const analyzeImageBtn = document.getElementById('analyze-image-btn') as HTMLButt
 let chat: Chat;
 let currentEnhancedPrompt: object | null = null;
 let uploadedImageBase64: { mimeType: string, data: string } | null = null;
+let selectedStylePreset: string | null = null;
 
 // JSON schema for the enhanced prompt
 const videoPromptSchema = {
@@ -340,12 +342,17 @@ async function handleGeneratePrompt() {
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
-    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', suggest angles like 'establishing shot', 'low-angle shot', 'overhead shot', 'dutch angle'. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
+    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. If a style preset is provided, ensure the 'meta.style' field in the JSON reflects this style and that other fields (like lighting, color_grading, cinematography, etc.) are influenced by it to create a cohesive result. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', suggest angles like 'establishing shot', 'low-angle shot', 'overhead shot', 'dutch angle'. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
     
+    let finalPrompt = `User idea: "${basicPrompt}"`;
+    if (selectedStylePreset) {
+        finalPrompt = `Apply the following style preset: "${selectedStylePreset}".\n\n${finalPrompt}`;
+    }
+
     try {
         const response = await ai.models.generateContent({
             model: model,
-            contents: `User idea: "${basicPrompt}"`,
+            contents: finalPrompt,
             config: {
                 systemInstruction,
                 responseMimeType: "application/json",
@@ -495,6 +502,24 @@ chatInput.addEventListener('keypress', (e) => {
 generateVideoBtn.addEventListener('click', handleGenerateVideo);
 imageUploadInput.addEventListener('change', handleImageUpload);
 analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
+
+stylePresetsContainer.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const button = target.closest('.style-preset-btn') as HTMLButtonElement;
+    if (!button) return;
+
+    // Remove active class from all buttons
+    stylePresetsContainer.querySelectorAll('.style-preset-btn').forEach(btn => btn.classList.remove('active'));
+
+    const style = button.dataset.style;
+    if (selectedStylePreset === style) {
+        // Deselect if clicking the active one again
+        selectedStylePreset = null;
+    } else {
+        selectedStylePreset = style;
+        button.classList.add('active');
+    }
+});
 
 
 // 7. Initialization logic

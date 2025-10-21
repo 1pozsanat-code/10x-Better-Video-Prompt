@@ -424,3 +424,37 @@ button:disabled {
     font-size: 0.9rem;
     opacity: 0.8;
 }
+
+.style-presets {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.style-preset-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.style-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.style-preset-btn.active {
+    background: linear-gradient(to right, #ff7e5f, #feb47b);
+    border-color: #ff7e5f;
+    font-weight: 600;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 126, 95, 0.4);
+}
