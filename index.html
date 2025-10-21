@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Prompt Enhancer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="index.css">
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0"
+  }
+}
+</script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Video Prompt Enhancer</h1>
+            <p class="subtitle">Transform basic prompts into professional video generation scripts with meta tokens and cinematography elements</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="form-section">
+                <h2 class="section-title"><i class="fas fa-pencil-alt"></i> Enter Your Basic Prompt</h2>
+                <div class="form-group">
+                    <label for="prompt">Describe your video idea</label>
+                    <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night...">A woman in futuristic clothing rides a futuristic scooter, escaping from creatures chasing her through the dusty deserts of an alien planet. Everything is covered in dust and smoke.</textarea>
+                </div>
+                <button id="generate-btn">
+                    <i class="fas fa-magic"></i> Enhance Prompt (10X)
+                </button>
+                
+                <div class="scene-visualization" id="scene-visualization">
+                    <!-- Scene elements will be dynamically generated here -->
+                </div>
+                
+                <div class="video-generation">
+                    <h2 class="section-title"><i class="fas fa-film"></i> Video Generation</h2>
+                    <p class="subtitle">Generate video instantly with Veo (simulation)</p>
+                    <div class="video-preview">
+                        <div class="placeholder">Video will appear here after generation</div>
+                    </div>
+                    <button id="generate-video-btn" disabled>
+                        <i class="fas fa-play-circle"></i> Generate Video
+                    </button>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <h2 class="section-title"><i class="fas fa-rocket"></i> Enhanced Prompts</h2>
+                <div id="results-container">
+                    <div class="placeholder">Your enhanced prompts will appear here...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chatbot">
+            <h2 class="section-title"><i class="fas fa-robot"></i> Prompt Assistant</h2>
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot-message">
+                    Hello! I'm your prompt assistant. I can help you refine your video prompts or answer any questions about the enhancement process.
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" placeholder="Ask something about your prompts..." id="chat-input">
+                <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notification" id="copy-notification">
+        <i class="fas fa-check-circle"></i>
+        <span>Prompt copied to clipboard!</span>
+    </div>
+
+    <script type="module" src="index.tsx"></script>
+</body>
+</html>
