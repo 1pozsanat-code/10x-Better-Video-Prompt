@@ -15,10 +15,8 @@ const sendChatBtn = document.getElementById('send-chat-btn') as HTMLButtonElemen
 const chatMessagesContainer = document.getElementById('chat-messages');
 const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLButtonElement;
 const videoPreview = document.querySelector('.video-preview');
-const sceneVisualizationContainer = document.getElementById('scene-visualization');
 const stylePresetsContainer = document.getElementById('style-presets');
 const savedPromptsContainer = document.getElementById('saved-prompts-container');
-
 
 // Image Upload Elements
 const imageUploadInput = document.getElementById('image-upload-input') as HTMLInputElement;
@@ -26,6 +24,12 @@ const imagePreview = document.getElementById('image-preview') as HTMLImageElemen
 const imagePlaceholder = document.getElementById('image-placeholder');
 const analyzeImageBtn = document.getElementById('analyze-image-btn') as HTMLButtonElement;
 
+// NEW Viewfinder selectors
+const viewfinderDisplay = document.getElementById('viewfinder-display');
+const viewfinderControls = document.getElementById('viewfinder-controls');
+const zoomSlider = document.getElementById('zoom-slider') as HTMLInputElement;
+const panSlider = document.getElementById('pan-slider') as HTMLInputElement;
+const tiltSlider = document.getElementById('tilt-slider') as HTMLInputElement;
 
 // 3. State variables
 let chat: Chat;
@@ -33,6 +37,14 @@ let currentEnhancedPrompt: object | null = null;
 let uploadedImageBase64: { mimeType: string, data: string } | null = null;
 let selectedStylePreset: string | null = null;
 const SAVED_PROMPTS_KEY = 'ai-video-prompts';
+
+// NEW Viewfinder state
+let currentSceneData: any | null = null;
+let tiltedDescriptionsCache: { gritty: any | null, epic: any | null } = {
+    gritty: null,
+    epic: null,
+};
+
 
 // JSON schema for the enhanced prompt
 const videoPromptSchema = {
@@ -140,17 +152,14 @@ const alternativePromptsSchema = {
     }
 };
 
-const sceneSuggestionsSchema = {
-    type: Type.ARRAY,
-    description: "An array of 3 specific visual elements for the scene.",
-    items: {
-        type: Type.OBJECT,
-        properties: {
-            element: { type: Type.STRING, description: "The name of the visual element (e.g., 'Holographic Koi Fish')." },
-            description: { type: Type.STRING, description: "A brief one-sentence description of the element." }
-        },
-        required: ["element", "description"]
-    }
+const tiltedDescriptionsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        subject: { type: Type.STRING, description: "The rewritten subject description." },
+        setting: { type: Type.STRING, description: "The rewritten setting description." },
+        environment: { type: Type.STRING, description: "The rewritten environment description." },
+    },
+    required: ["subject", "setting", "environment"]
 };
 
 
@@ -269,7 +278,7 @@ function displayEnhancedPrompt(promptData: any) {
     generateSimplePrompt(promptData, simpleTextContent, copySimpleBtn);
     
     generateVideoBtn.disabled = false;
-    updateSceneVisualization(promptData.scene);
+    setupInteractiveViewfinder(promptData.scene);
 }
 
 /** Displays the alternative prompts from image analysis */
@@ -339,68 +348,35 @@ const iconMap: { [key: string]: string } = {
     'action': 'fa-bolt', 'escape': 'fa-running', 'chase': 'fa-running',
 };
 
-/** Generates and displays scene element suggestions */
-async function getAndDisplaySceneSuggestions(scene: any, container: HTMLElement) {
-    try {
-        const suggestionPrompt = `Based on the following scene description, suggest 3 specific, tangible, and visually interesting elements or objects that would exist in this environment. Focus on small details that enhance the atmosphere. Return an empty array if no specific suggestions come to mind.
-
-Setting: ${scene.setting}
-Subject: ${scene.subject}
-Environment: ${scene.environment}`;
-
-        const response = await ai.models.generateContent({
-            model: chatModel, // Use the faster model for this creative task
-            contents: suggestionPrompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: sceneSuggestionsSchema,
-            },
-        });
-        
-        const suggestions = JSON.parse(response.text);
-
-        // Clear loading placeholder
-        container.innerHTML = ''; 
-        
-        if (!suggestions || suggestions.length === 0) {
-             const parent = container.parentElement;
-             if (parent) parent.style.display = 'none'; // Hide the whole suggestions section if there are no suggestions
-             return;
-        }
-
-        suggestions.forEach((sug: {element: string, description: string}) => {
-            const suggestionElement = document.createElement('div');
-            suggestionElement.className = 'scene-element suggestion'; 
-            suggestionElement.title = sug.description; // Tooltip for full description
-            suggestionElement.innerHTML = `
-                <div class="scene-icon"><i class="fas fa-lightbulb"></i></div>
-                <div class="scene-title">${sug.element}</div>
-                <div class="scene-desc">${sug.description}</div>
-            `;
-            container.appendChild(suggestionElement);
-        });
-
-    } catch (error) {
-        console.error('Error generating scene suggestions:', error);
-        container.innerHTML = '<div class="placeholder" style="color: #ff8a80; text-align: center; width: 100%;">Could not generate suggestions.</div>';
+/** Sets up the interactive viewfinder with controls */
+function setupInteractiveViewfinder(scene: any) {
+    if (!scene || !viewfinderDisplay || !viewfinderControls) {
+        if(viewfinderDisplay) viewfinderDisplay.innerHTML = '<div class="placeholder">Scene data is missing.</div>';
+        if(viewfinderControls) viewfinderControls.style.display = 'none';
+        return;
     }
-}
 
+    // Store data and reset caches for this new scene
+    currentSceneData = scene;
+    tiltedDescriptionsCache = { gritty: null, epic: null };
 
-/** Updates the scene visualization based on the generated prompt */
-function updateSceneVisualization(scene: any) {
-    sceneVisualizationContainer.innerHTML = '';
-    if (!scene) return;
+    // Reset sliders to default positions
+    zoomSlider.value = '2';
+    panSlider.value = '2';
+    tiltSlider.value = '2';
     
-    // --- Render Core Elements ---
-    const coreElementsContainer = document.createElement('div');
-    coreElementsContainer.className = 'scene-elements-grid';
+    viewfinderDisplay.innerHTML = ''; // Clear previous content
+    viewfinderControls.style.display = 'grid'; // Show controls
 
-    const elements: {title: string, desc: string}[] = [];
-    if (scene.subject) elements.push({ title: 'Subject', desc: scene.subject });
-    if (scene.setting) elements.push({ title: 'Setting', desc: scene.setting });
-    if (scene.antagonists && scene.antagonists.toLowerCase() !== 'none') elements.push({ title: 'Antagonist', desc: scene.antagonists });
-    if (scene.environment) elements.push({ title: 'Environment', desc: scene.environment });
+    const grid = document.createElement('div');
+    grid.className = 'viewfinder-grid';
+    grid.id = 'viewfinder-grid'; // Add id for easy selection
+    
+    const elements: { title: string, desc: string, group: 'character' | 'world' }[] = [];
+    if (scene.subject) elements.push({ title: 'Subject', desc: scene.subject, group: 'character' });
+    if (scene.setting) elements.push({ title: 'Setting', desc: scene.setting, group: 'world' });
+    if (scene.antagonists && scene.antagonists.toLowerCase() !== 'none') elements.push({ title: 'Antagonist', desc: scene.antagonists, group: 'character' });
+    if (scene.environment) elements.push({ title: 'Environment', desc: scene.environment, group: 'world' });
     
     elements.forEach(el => {
         const lowerDesc = el.desc.toLowerCase();
@@ -413,37 +389,133 @@ function updateSceneVisualization(scene: any) {
         }
 
         const sceneElement = document.createElement('div');
-        sceneElement.className = 'scene-element';
+        sceneElement.className = 'viewfinder-element';
+        sceneElement.dataset.group = el.group; // For panning
+        sceneElement.dataset.title = el.title; // For tilting
         sceneElement.innerHTML = `
-            <div class="scene-icon"><i class="fas ${iconClass}"></i></div>
-            <div class="scene-title">${el.title}</div>
-            <div class="scene-desc">${el.desc}</div>
+            <div class="viewfinder-icon"><i class="fas ${iconClass}"></i></div>
+            <div class="viewfinder-title">${el.title}</div>
+            <div class="viewfinder-desc">${el.desc}</div>
         `;
-        coreElementsContainer.appendChild(sceneElement);
+        grid.appendChild(sceneElement);
     });
-    sceneVisualizationContainer.appendChild(coreElementsContainer);
 
-    // --- Render Suggested Elements ---
-    if (scene.setting && scene.subject && scene.environment) {
-        const suggestionsSection = document.createElement('div');
-        suggestionsSection.className = 'suggestions-section';
-        
-        const suggestionsHeader = document.createElement('h3');
-        suggestionsHeader.className = 'suggestions-title';
-        suggestionsHeader.innerHTML = `<i class="fas fa-magic"></i> Suggested Details`;
-        suggestionsSection.appendChild(suggestionsHeader);
+    viewfinderDisplay.appendChild(grid);
+    applyZoom(); // Apply initial zoom level
+    applyPan(); // Apply initial pan focus
+}
 
-        const suggestionsContainer = document.createElement('div');
-        suggestionsContainer.className = 'scene-elements-grid';
-        suggestionsContainer.innerHTML = `<div class="placeholder" style="text-align: center; width: 100%;"><i class="fas fa-spinner fa-spin"></i> Generating ideas...</div>`;
-        suggestionsSection.appendChild(suggestionsContainer);
+/** Applies zoom level based on slider */
+function applyZoom() {
+    const grid = document.getElementById('viewfinder-grid');
+    if (!grid) return;
+    const level = zoomSlider.value;
+    grid.classList.remove('zoom-level-1', 'zoom-level-2');
+    grid.classList.add(`zoom-level-${level}`);
+}
 
-        sceneVisualizationContainer.appendChild(suggestionsSection);
+/** Applies pan focus based on slider */
+function applyPan() {
+    const elements = document.querySelectorAll('.viewfinder-element');
+    const focus = panSlider.value; // 1: character, 2: neutral, 3: world
 
-        // Asynchronously fetch and display suggestions
-        getAndDisplaySceneSuggestions(scene, suggestionsContainer);
+    elements.forEach(el => {
+        const element = el as HTMLElement;
+        element.classList.remove('pan-unfocused');
+
+        if (focus === '1' && element.dataset.group !== 'character') {
+            element.classList.add('pan-unfocused');
+        } else if (focus === '3' && element.dataset.group !== 'world') {
+            element.classList.add('pan-unfocused');
+        }
+    });
+}
+
+/** Handles tilt angle changes */
+async function handleTilt() {
+    if (!currentSceneData) return;
+    const angle = tiltSlider.value; // 1: gritty, 2: neutral, 3: epic
+
+    let newDescriptions: any = null;
+    let tone: 'gritty' | 'epic' | null = null;
+    
+    if (angle === '1') tone = 'gritty';
+    if (angle === '3') tone = 'epic';
+
+    if (tone) {
+        if (tiltedDescriptionsCache[tone]) {
+            newDescriptions = tiltedDescriptionsCache[tone];
+        } else {
+            newDescriptions = await generateTiltedDescriptions(tone);
+            tiltedDescriptionsCache[tone] = newDescriptions; // Cache the result
+        }
+    } else { // Neutral
+        newDescriptions = {
+            subject: currentSceneData.subject,
+            setting: currentSceneData.setting,
+            environment: currentSceneData.environment,
+            // We don't modify antagonist
+        };
+    }
+    
+    updateTiltDescriptions(newDescriptions);
+}
+
+/** Fetches new descriptions from AI based on tone */
+async function generateTiltedDescriptions(tone: 'gritty' | 'epic'): Promise<any> {
+    const allDescElements = document.querySelectorAll('.viewfinder-desc');
+    allDescElements.forEach(el => el.classList.add('loading-tilt'));
+
+    try {
+        const prompt = `Rewrite the following video scene descriptions to have a more "${tone}" and cinematic tone. Focus on evocative language that matches the requested tone. Provide the output as a JSON object with 'subject', 'setting', and 'environment' keys.
+
+Original Subject: ${currentSceneData.subject}
+Original Setting: ${currentSceneData.setting}
+Original Environment: ${currentSceneData.environment}
+`;
+        const response = await ai.models.generateContent({
+            model: chatModel, // Use fast model for interactive edits
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: tiltedDescriptionsSchema,
+            },
+        });
+        return JSON.parse(response.text);
+    } catch (error) {
+        console.error(`Error generating ${tone} descriptions:`, error);
+        showNotification(`Error: Could not generate ${tone} descriptions.`);
+        return null; // Return null on error
+    } finally {
+        allDescElements.forEach(el => el.classList.remove('loading-tilt'));
     }
 }
+
+/** Updates the text content of the viewfinder elements with new descriptions */
+function updateTiltDescriptions(descriptions: any) {
+    if (!descriptions) return;
+    
+    const elements = document.querySelectorAll('.viewfinder-element');
+    elements.forEach(el => {
+        const element = el as HTMLElement;
+        const title = element.dataset.title?.toLowerCase();
+        const descEl = element.querySelector('.viewfinder-desc') as HTMLElement;
+        
+        if (!descEl) return;
+        
+        if (title === 'subject' && descriptions.subject) {
+            descEl.textContent = descriptions.subject;
+        } else if (title === 'setting' && descriptions.setting) {
+            descEl.textContent = descriptions.setting;
+        } else if (title === 'environment' && descriptions.environment) {
+            descEl.textContent = descriptions.environment;
+        } else if (title === 'antagonist') {
+            // Antagonist is not tilted, reset to original if needed
+            descEl.textContent = currentSceneData.antagonists;
+        }
+    });
+}
+
 
 // 5. Core logic functions
 
@@ -458,7 +530,10 @@ async function handleGeneratePrompt() {
     generateBtn.disabled = true;
     generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing...';
     resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Generating your enhanced prompt...</div>';
-    sceneVisualizationContainer.innerHTML = '';
+    if (viewfinderDisplay && viewfinderControls) {
+        viewfinderDisplay.innerHTML = '<div class="placeholder">Generate an enhanced prompt to activate the viewfinder.</div>';
+        viewfinderControls.style.display = 'none';
+    }
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
@@ -691,6 +766,12 @@ function init() {
     generateVideoBtn.addEventListener('click', handleGenerateVideo);
     imageUploadInput.addEventListener('change', handleImageUpload);
     analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
+
+    // NEW: Viewfinder control listeners
+    zoomSlider.addEventListener('input', applyZoom);
+    panSlider.addEventListener('input', applyPan);
+    tiltSlider.addEventListener('change', handleTilt); // Use 'change' to avoid too many API calls
+
 
     // Saved prompts event delegation
     savedPromptsContainer.addEventListener('click', (e) => {

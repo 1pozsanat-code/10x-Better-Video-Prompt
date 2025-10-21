@@ -75,8 +75,27 @@
                     </div>
                 </div>
 
-                <div class="scene-visualization" id="scene-visualization">
-                    <!-- Scene elements will be dynamically generated here -->
+                <div id="interactive-scene-container">
+                    <h2 class="section-title"><i class="fas fa-camera-retro"></i> Interactive Viewfinder</h2>
+                    <div class="viewfinder-wrapper">
+                        <div class="viewfinder-display" id="viewfinder-display">
+                            <div class="placeholder">Generate an enhanced prompt to activate the viewfinder.</div>
+                        </div>
+                        <div class="viewfinder-controls" id="viewfinder-controls" style="display: none;">
+                            <div class="control-group">
+                                <label for="zoom-slider"><i class="fas fa-search"></i> Zoom</label>
+                                <input type="range" min="1" max="2" value="2" class="slider" id="zoom-slider">
+                            </div>
+                            <div class="control-group">
+                                <label for="pan-slider"><i class="fas fa-arrows-alt-h"></i> Pan Focus</label>
+                                <input type="range" min="1" max="3" value="2" class="slider" id="pan-slider">
+                            </div>
+                            <div class="control-group">
+                                <label for="tilt-slider"><i class="fas fa-arrows-alt-v"></i> Tilt Angle</label>
+                                <input type="range" min="1" max="3" value="2" class="slider" id="tilt-slider">
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="video-generation">
