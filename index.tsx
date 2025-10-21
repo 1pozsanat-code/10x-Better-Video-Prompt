@@ -801,19 +801,24 @@ function init() {
     // Style preset button logic
     stylePresetsContainer.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        const button = target.closest('.style-preset-btn');
-        if (button) {
+        const card = target.closest('.style-preset-card');
+        if (card) {
+            const button = card.querySelector('.style-preset-btn');
+            if (!button) return;
+
             const style = button.getAttribute('data-style');
-            const currentActive = stylePresetsContainer.querySelector('.active');
+            const currentActive = stylePresetsContainer.querySelector('.style-preset-card.active');
             
             if (currentActive) {
                 currentActive.classList.remove('active');
             }
             
             if (selectedStylePreset === style) {
+                // If clicking the active one, deactivate it
                 selectedStylePreset = null;
             } else {
-                button.classList.add('active');
+                // Activate the new one
+                card.classList.add('active');
                 selectedStylePreset = style;
             }
         }

@@ -572,37 +572,80 @@ button:disabled {
 }
 
 .style-presets {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
 }
 
-.style-preset-btn {
+.style-preset-card {
     background: rgba(255, 255, 255, 0.1);
-    color: white;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 10px 15px;
     border-radius: 8px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    padding: 10px;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
 }
 
-.style-preset-btn:hover {
+.style-preset-card:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.4);
     transform: translateY(-2px);
 }
 
-.style-preset-btn.active {
+.style-preset-card.active {
     background: linear-gradient(to right, #ff7e5f, #feb47b);
     border-color: #ff7e5f;
-    font-weight: 600;
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 126, 95, 0.4);
+}
+
+.style-preset-card.active .style-preset-btn {
+    font-weight: 600;
+}
+
+.style-preset-card.active .style-preset-description {
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.style-preset-description {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    margin-top: 8px;
+    line-height: 1.4;
+    padding: 0 5px;
+}
+
+.style-preset-btn {
+    background: transparent;
+    color: white;
+    border: none;
+    padding: 10px 5px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.style-preset-btn:hover {
+    background: transparent;
+    transform: none;
+    box-shadow: none;
+}
+
+.style-preset-btn.active {
+    background: none;
+    border-color: transparent;
+    font-weight: normal; /* Font weight is now on the card's active state */
+    transform: none;
+    box-shadow: none;
 }
 
 .saved-prompts-section {
