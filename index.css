@@ -23,9 +23,21 @@ header {
     padding: 20px;
 }
 
+.title-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.header-icon {
+    width: 50px;
+    height: 50px;
+}
+
 h1 {
     font-size: 2.8rem;
-    margin-bottom: 10px;
     background: linear-gradient(to right, #ff7e5f, #feb47b);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
