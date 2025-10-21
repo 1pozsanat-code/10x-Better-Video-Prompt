@@ -496,6 +496,7 @@ button:disabled {
     margin-bottom: 20px;
     position: relative;
     overflow: hidden;
+    perspective: 800px; /* Added for 3D effect */
 }
 
 .viewfinder-display::before { /* Viewfinder overlay effect */
@@ -519,7 +520,7 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 15px;
-    transition: opacity 0.3s;
+    transition: transform 0.1s linear; /* Smooth visual transitions */
 }
 
 .viewfinder-element {
@@ -528,12 +529,7 @@ button:disabled {
     padding: 15px;
     text-align: center;
     border-left: 3px solid #ff7e5f;
-    transition: transform 0.3s, opacity 0.3s, background-color 0.3s;
-}
-
-.viewfinder-element.pan-unfocused {
-    opacity: 0.5;
-    transform: scale(0.95);
+    transition: background-color 0.3s;
 }
 
 .viewfinder-icon {
@@ -573,14 +569,6 @@ button:disabled {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-.zoom-level-1 .viewfinder-desc {
-    max-height: 0;
-    opacity: 0;
-    margin-top: -5px; /* Adjust for smoother transition */
-    padding: 0;
-    min-height: 0;
 }
 
 .viewfinder-controls {

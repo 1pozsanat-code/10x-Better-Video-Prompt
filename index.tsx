@@ -426,9 +426,9 @@ function setupInteractiveViewfinder(scene: any) {
     tiltedDescriptionsCache = { gritty: null, epic: null };
 
     // Reset sliders to default positions
-    zoomSlider.value = '2';
-    panSlider.value = '2';
-    tiltSlider.value = '2';
+    zoomSlider.value = '100';
+    panSlider.value = '0';
+    tiltSlider.value = '0';
     
     viewfinderDisplay.innerHTML = ''; // Clear previous content
     viewfinderControls.style.display = 'grid'; // Show controls
@@ -437,11 +437,11 @@ function setupInteractiveViewfinder(scene: any) {
     grid.className = 'viewfinder-grid';
     grid.id = 'viewfinder-grid'; // Add id for easy selection
     
-    const elements: { title: string, desc: string, group: 'character' | 'world' }[] = [];
-    if (scene.subject) elements.push({ title: 'Subject', desc: scene.subject, group: 'character' });
-    if (scene.setting) elements.push({ title: 'Setting', desc: scene.setting, group: 'world' });
-    if (scene.antagonists && scene.antagonists.toLowerCase() !== 'none') elements.push({ title: 'Antagonist', desc: scene.antagonists, group: 'character' });
-    if (scene.environment) elements.push({ title: 'Environment', desc: scene.environment, group: 'world' });
+    const elements: { title: string, desc: string }[] = [];
+    if (scene.subject) elements.push({ title: 'Subject', desc: scene.subject });
+    if (scene.setting) elements.push({ title: 'Setting', desc: scene.setting });
+    if (scene.antagonists && scene.antagonists.toLowerCase() !== 'none') elements.push({ title: 'Antagonist', desc: scene.antagonists });
+    if (scene.environment) elements.push({ title: 'Environment', desc: scene.environment });
     
     elements.forEach(el => {
         const lowerDesc = el.desc.toLowerCase();
@@ -455,7 +455,6 @@ function setupInteractiveViewfinder(scene: any) {
 
         const sceneElement = document.createElement('div');
         sceneElement.className = 'viewfinder-element';
-        sceneElement.dataset.group = el.group; // For panning
         sceneElement.dataset.title = el.title; // For tilting
         sceneElement.innerHTML = `
             <div class="viewfinder-icon"><i class="fas ${iconClass}"></i></div>
@@ -466,53 +465,38 @@ function setupInteractiveViewfinder(scene: any) {
     });
 
     viewfinderDisplay.appendChild(grid);
-    applyZoom(); // Apply initial zoom level
-    applyPan(); // Apply initial pan focus
+    applyViewfinderTransforms(); // Apply initial transforms
 }
 
-/** Applies zoom level based on slider */
-function applyZoom() {
+/** Applies all viewfinder transformations (zoom, pan, tilt) based on sliders */
+function applyViewfinderTransforms() {
     const grid = document.getElementById('viewfinder-grid');
     if (!grid) return;
-    const level = zoomSlider.value;
-    grid.classList.remove('zoom-level-1', 'zoom-level-2');
-    grid.classList.add(`zoom-level-${level}`);
+
+    const zoom = parseFloat(zoomSlider.value) / 100; // e.g., 100 -> 1.0
+    const pan = parseInt(panSlider.value, 10); // in %
+    const tilt = parseInt(tiltSlider.value, 10); // in degrees
+
+    grid.style.transform = `translateX(${pan}%) scale(${zoom}) rotateX(${tilt}deg)`;
 }
 
-/** Applies pan focus based on slider */
-function applyPan() {
-    const elements = document.querySelectorAll('.viewfinder-element');
-    const focus = panSlider.value; // 1: character, 2: neutral, 3: world
-
-    elements.forEach(el => {
-        const element = el as HTMLElement;
-        element.classList.remove('pan-unfocused');
-
-        if (focus === '1' && element.dataset.group !== 'character') {
-            element.classList.add('pan-unfocused');
-        } else if (focus === '3' && element.dataset.group !== 'world') {
-            element.classList.add('pan-unfocused');
-        }
-    });
-}
-
-/** Handles tilt angle changes */
-async function handleTilt() {
+/** Handles tilt angle content changes based on AI */
+async function handleTiltContentUpdate() {
     if (!currentSceneData) return;
-    const angle = tiltSlider.value; // 1: gritty, 2: neutral, 3: epic
+    const angleValue = parseInt(tiltSlider.value, 10);
 
     let newDescriptions: any = null;
     let tone: 'gritty' | 'epic' | null = null;
     
-    if (angle === '1') tone = 'gritty';
-    if (angle === '3') tone = 'epic';
+    if (angleValue <= -20) tone = 'gritty';
+    else if (angleValue >= 20) tone = 'epic';
 
     if (tone) {
         if (tiltedDescriptionsCache[tone]) {
             newDescriptions = tiltedDescriptionsCache[tone];
         } else {
             newDescriptions = await generateTiltedDescriptions(tone);
-            tiltedDescriptionsCache[tone] = newDescriptions; // Cache the result
+            if (newDescriptions) tiltedDescriptionsCache[tone] = newDescriptions; // Cache the result if successful
         }
     } else { // Neutral
         newDescriptions = {
@@ -1053,10 +1037,11 @@ function init() {
     analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
     analyzeNegativeBtn.addEventListener('click', analyzeNegativePrompt);
 
-    // NEW: Viewfinder control listeners
-    zoomSlider.addEventListener('input', applyZoom);
-    panSlider.addEventListener('input', applyPan);
-    tiltSlider.addEventListener('change', handleTilt); // Use 'change' to avoid too many API calls
+    // Viewfinder control listeners
+    zoomSlider.addEventListener('input', applyViewfinderTransforms);
+    panSlider.addEventListener('input', applyViewfinderTransforms);
+    tiltSlider.addEventListener('input', applyViewfinderTransforms); // Visual transform
+    tiltSlider.addEventListener('change', handleTiltContentUpdate); // AI content update
 
 
     // Saved prompts event delegation
