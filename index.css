@@ -375,6 +375,9 @@ button:disabled {
     background: rgba(255, 255, 255, 0.15);
     align-self: flex-start;
     border-bottom-left-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .bot-message.thinking {
@@ -954,4 +957,18 @@ button:disabled {
 
 .prompt-suggestions-section .alt-prompt-card {
     margin-bottom: 15px;
+}
+
+.speak-btn {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    align-self: center;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+}
+
+.speak-btn.playing {
+    background: #ff7e5f;
 }

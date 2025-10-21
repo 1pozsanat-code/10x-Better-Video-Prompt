@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, Type } from "@google/genai";
+import { GoogleGenAI, Chat, Type, Modality } from "@google/genai";
 
 // 1. Initialize the Gemini AI Model
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -55,6 +55,9 @@ let tiltedDescriptionsCache: { gritty: any | null, epic: any | null } = {
     epic: null,
 };
 
+// NEW Audio state
+let outputAudioContext: AudioContext | null = null;
+let currentlyPlayingSource: AudioBufferSourceNode | null = null;
 
 // JSON schema for the enhanced prompt
 const videoPromptSchema = {
@@ -272,6 +275,42 @@ const styleVisualsSchema = {
 
 // 4. Helper functions
 
+/**
+ * Decodes a base64 string into a Uint8Array.
+ */
+function decode(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+}
+
+/**
+ * Decodes raw PCM audio data into an AudioBuffer.
+ */
+async function decodeAudioData(
+    data: Uint8Array,
+    ctx: AudioContext,
+    sampleRate: number,
+    numChannels: number,
+): Promise<AudioBuffer> {
+    const dataInt16 = new Int16Array(data.buffer);
+    const frameCount = dataInt16.length / numChannels;
+    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+    for (let channel = 0; channel < numChannels; channel++) {
+        const channelData = buffer.getChannelData(channel);
+        for (let i = 0; i < frameCount; i++) {
+            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+        }
+    }
+    return buffer;
+}
+
+
 /** Shows a notification message */
 function showNotification(message: string = 'Copied to clipboard!') {
     const span = copyNotification.querySelector('span');
@@ -294,12 +333,25 @@ function copyToClipboard(text: string) {
 
 /** Adds a message to the chat UI */
 function addMessage(text: string, sender: 'user' | 'bot') {
-  const messageEl = document.createElement('div');
-  messageEl.className = `message ${sender}-message`;
-  messageEl.textContent = text;
+    const messageEl = document.createElement('div');
+    messageEl.className = `message ${sender}-message`;
+    
+    const messageContent = document.createElement('span');
+    messageContent.textContent = text;
+    messageEl.appendChild(messageContent);
 
-  chatMessagesContainer.appendChild(messageEl);
-  chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+    if (sender === 'bot') {
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'action-btn speak-btn';
+        speakBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+        speakBtn.setAttribute('aria-label', 'Play audio for this message');
+        speakBtn.title = 'Hear this message';
+        speakBtn.onclick = () => speakText(text, speakBtn);
+        messageEl.appendChild(speakBtn);
+    }
+
+    chatMessagesContainer.appendChild(messageEl);
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
 }
 
 /** Displays the enhanced prompt in the results container */
@@ -989,6 +1041,76 @@ async function handleSendMessage() {
     }
 }
 
+/** Generates and plays audio from text for the chat bot */
+async function speakText(text: string, buttonElement: HTMLButtonElement) {
+    if (!outputAudioContext) {
+        console.error("AudioContext not initialized.");
+        showNotification("Audio playback is not available.");
+        return;
+    }
+
+    // Stop any currently playing audio from the assistant
+    if (currentlyPlayingSource) {
+        currentlyPlayingSource.stop();
+        currentlyPlayingSource.disconnect();
+        currentlyPlayingSource = null;
+        // Also reset any other 'playing' buttons
+        document.querySelectorAll('.speak-btn.playing').forEach(btn => {
+            btn.classList.remove('playing');
+            btn.innerHTML = '<i class="fas fa-volume-up"></i>';
+        });
+    }
+    
+    buttonElement.disabled = true;
+    buttonElement.classList.add('playing');
+    buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash-preview-tts",
+          contents: [{ parts: [{ text: `Speak in a friendly, helpful tone: ${text}` }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Kore' },
+                },
+            },
+          },
+        });
+
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!base64Audio) {
+            throw new Error("No audio data received from API.");
+        }
+
+        const audioBytes = decode(base64Audio);
+        const audioBuffer = await decodeAudioData(audioBytes, outputAudioContext, 24000, 1);
+        
+        const source = outputAudioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(outputAudioContext.destination);
+        
+        source.onended = () => {
+            buttonElement.disabled = false;
+            buttonElement.classList.remove('playing');
+            buttonElement.innerHTML = '<i class="fas fa-volume-up"></i>';
+            currentlyPlayingSource = null;
+        };
+
+        source.start();
+        currentlyPlayingSource = source;
+
+    } catch (error) {
+        console.error("Error generating or playing speech:", error);
+        showNotification("Sorry, could not play audio.");
+        buttonElement.disabled = false;
+        buttonElement.classList.remove('playing');
+        buttonElement.innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
+}
+
+
 /** Simulates video generation */
 function handleGenerateVideo() {
     generateVideoBtn.disabled = true;
@@ -1261,6 +1383,11 @@ function handleDeletePrompt(promptId: number) {
 
 // 9. Event listeners & Initialization
 function init() {
+    // Initialize AudioContext for TTS
+    // Use `any` for webkitAudioContext to support older Safari versions
+    outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+
+
     generateBtn.addEventListener('click', handleGeneratePrompt);
     sendChatBtn.addEventListener('click', handleSendMessage);
     chatInput.addEventListener('keypress', (e) => {
