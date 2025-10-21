@@ -3,7 +3,7 @@ import { GoogleGenAI, Chat, Type } from "@google/genai";
 // 1. Initialize the Gemini AI Model
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const model = 'gemini-2.5-pro'; // Using a powerful model for complex JSON generation
-const chatModel = 'gemini-2.5-flash'; // Using a faster model for chat
+const chatModel = 'gemini-2.5-flash'; // Using a faster model for chat and summarization
 
 // 2. DOM element selectors
 const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
@@ -140,32 +140,38 @@ function displayEnhancedPrompt(promptData: any) {
     const promptCard = document.createElement('div');
     promptCard.className = 'prompt-card';
 
-    const promptHeader = document.createElement('div');
-    promptHeader.className = 'prompt-header';
+    // --- JSON Section ---
+    const jsonHeader = document.createElement('div');
+    jsonHeader.className = 'prompt-header';
+    jsonHeader.innerHTML = `
+        <div class="prompt-title">Enhanced Prompt (JSON)</div>
+        <div class="prompt-actions">
+            <button class="action-btn" id="copy-json-btn"><i class="fas fa-copy"></i> Copy</button>
+        </div>
+    `;
 
-    const promptTitle = document.createElement('div');
-    promptTitle.className = 'prompt-title';
-    promptTitle.textContent = 'Enhanced Video Prompt';
+    const jsonContent = document.createElement('pre');
+    jsonContent.className = 'prompt-content';
+    jsonContent.textContent = JSON.stringify(promptData, null, 2);
 
-    const promptActions = document.createElement('div');
-    promptActions.className = 'prompt-actions';
+    // --- Simplified Text Section ---
+    const simpleTextHeader = document.createElement('div');
+    simpleTextHeader.className = 'prompt-header simple-text-header'; // Add new class for styling
+    simpleTextHeader.innerHTML = `
+        <div class="prompt-title">Simplified Text Prompt</div>
+        <div class="prompt-actions">
+            <button class="action-btn" id="copy-simple-btn" disabled><i class="fas fa-copy"></i> Copy</button>
+        </div>
+    `;
 
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'action-btn';
-    copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
-    copyBtn.onclick = () => copyToClipboard(JSON.stringify(promptData, null, 2));
-
-    promptActions.appendChild(copyBtn);
-    promptHeader.appendChild(promptTitle);
-    promptHeader.appendChild(promptActions);
-
-    const promptContent = document.createElement('pre');
-    promptContent.className = 'prompt-content';
-    promptContent.textContent = JSON.stringify(promptData, null, 2);
+    const simpleTextContent = document.createElement('div');
+    simpleTextContent.className = 'prompt-content simple-text-content placeholder';
+    simpleTextContent.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating simplified text...`;
     
+    // --- Tags Section ---
     const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'tags-container';
     if (promptData.tags && Array.isArray(promptData.tags)) {
-        tagsContainer.style.marginTop = '15px';
         const strong = document.createElement('strong');
         strong.textContent = 'Tags: ';
         tagsContainer.appendChild(strong);
@@ -177,15 +183,56 @@ function displayEnhancedPrompt(promptData: any) {
         });
     }
 
-    promptCard.appendChild(promptHeader);
-    promptCard.appendChild(promptContent);
+    // --- Assemble Card ---
+    promptCard.appendChild(jsonHeader);
+    promptCard.appendChild(jsonContent);
+    promptCard.appendChild(simpleTextHeader);
+    promptCard.appendChild(simpleTextContent);
     promptCard.appendChild(tagsContainer);
     
     resultsContainer.appendChild(promptCard);
-    generateVideoBtn.disabled = false;
+    
+    // --- Add event listeners ---
+    (promptCard.querySelector('#copy-json-btn') as HTMLButtonElement).onclick = () => copyToClipboard(JSON.stringify(promptData, null, 2));
 
+    // --- Generate and display simple prompt ---
+    const copySimpleBtn = promptCard.querySelector('#copy-simple-btn') as HTMLButtonElement;
+    generateSimplePrompt(promptData, simpleTextContent, copySimpleBtn);
+    
+    generateVideoBtn.disabled = false;
     updateSceneVisualization(promptData.scene);
 }
+
+
+/** Generates and populates the simplified text prompt */
+async function generateSimplePrompt(promptData: any, contentElement: HTMLElement, buttonElement: HTMLButtonElement) {
+    try {
+        const generationPrompt = `Based on the following detailed JSON video prompt, create a concise, human-readable, single-paragraph text prompt for an AI video generation model. Focus on the most critical visual elements, actions, atmosphere, and cinematic style. The output must be under 1000 characters and should be plain text only, without any titles, markdown, or explanations.
+
+JSON Prompt:
+${JSON.stringify(promptData, null, 2)}`;
+
+        const response = await ai.models.generateContent({
+            model: chatModel, // Use the faster model for this task
+            contents: generationPrompt,
+        });
+        
+        const simpleText = response.text.trim();
+        
+        contentElement.textContent = simpleText;
+        contentElement.classList.remove('placeholder');
+        
+        buttonElement.disabled = false;
+        buttonElement.onclick = () => copyToClipboard(simpleText);
+
+    } catch (error) {
+        console.error('Error generating simple prompt:', error);
+        contentElement.innerHTML = 'Failed to generate simplified prompt.';
+        contentElement.style.color = '#ff8a80';
+        contentElement.classList.remove('placeholder');
+    }
+}
+
 
 const iconMap: { [key: string]: string } = {
     'woman': 'fa-female', 'man': 'fa-male', 'person': 'fa-user',
