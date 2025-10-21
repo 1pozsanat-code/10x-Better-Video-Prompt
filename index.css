@@ -639,6 +639,71 @@ button:disabled {
 }
 
 
+.style-preset-visual {
+    height: 50px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    background-color: #333;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#style-visual-cinematic {
+    background: linear-gradient(160deg, #111, #3a3f44);
+}
+#style-visual-cinematic::before,
+#style-visual-cinematic::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 8px; /* Letterbox bars */
+    background: black;
+    z-index: 1;
+}
+#style-visual-cinematic::before { top: 0; }
+#style-visual-cinematic::after { bottom: 0; }
+
+#style-visual-anime {
+    background: linear-gradient(135deg, #ff85b1, #8e94ff);
+}
+#style-visual-anime::after { /* Style lines */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: repeating-linear-gradient(
+        -30deg,
+        rgba(255,255,255,0.15),
+        rgba(255,255,255,0.15) 1px,
+        transparent 1px,
+        transparent 8px
+    );
+}
+
+#style-visual-photorealistic {
+    background: linear-gradient(to bottom, #aaccff, #77cc99); /* Sky to field */
+}
+#style-visual-photorealistic::after { /* Sun */
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 15%;
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, rgba(255,255,240,0.8) 0%, rgba(255,255,240,0) 60%);
+}
+
+#style-visual-abstract {
+    background: 
+        radial-gradient(circle at 10% 20%, #ff5733 0%, transparent 30%),
+        radial-gradient(circle at 80% 90%, #900c3f 0%, transparent 40%),
+        linear-gradient(45deg, #154360, #1e8449);
+}
+
 .style-presets {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -649,10 +714,10 @@ button:disabled {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
-    padding: 10px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
     cursor: pointer;
 }
@@ -685,6 +750,7 @@ button:disabled {
     margin-top: 8px;
     line-height: 1.4;
     padding: 0 5px;
+    flex-grow: 1;
 }
 
 .style-preset-btn {
