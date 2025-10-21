@@ -33,8 +33,14 @@
                     <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="negative-prompt">Exclusion Criteria (Negative Prompt)</label>
+                    <div class="form-group-header">
+                        <label for="negative-prompt">Exclusion Criteria (Negative Prompt)</label>
+                        <button id="analyze-negative-btn" class="inline-action-btn" title="Analyze Exclusions">
+                            <i class="fas fa-lightbulb"></i> Analyze
+                        </button>
+                    </div>
                     <textarea id="negative-prompt" placeholder="Example: low quality, blurry, text, watermark, cartoonish style..."></textarea>
+                    <div id="negative-prompt-feedback" class="feedback-container" style="display: none;"></div>
                 </div>
                 <div class="form-group">
                     <label>Choose a Style (Optional)</label>

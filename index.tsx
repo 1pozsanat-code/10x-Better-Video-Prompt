@@ -35,6 +35,10 @@ const tiltSlider = document.getElementById('tilt-slider') as HTMLInputElement;
 // NEW Scene Catalysts selector
 const catalystsContainer = document.getElementById('catalysts-content');
 
+// NEW Negative Prompt Analysis selectors
+const analyzeNegativeBtn = document.getElementById('analyze-negative-btn') as HTMLButtonElement;
+const negativePromptFeedback = document.getElementById('negative-prompt-feedback');
+
 
 // 3. State variables
 let chat: Chat;
@@ -186,6 +190,15 @@ const catalystSchema = {
         }
     },
     required: ["antagonist_actions", "environmental_events"]
+};
+
+const negativePromptAnalysisSchema = {
+    type: Type.OBJECT,
+    properties: {
+        feedback: { type: Type.STRING, description: "Constructive feedback and analysis of the negative prompt." },
+        suggested_prompt: { type: Type.STRING, description: "A revised, more effective negative prompt." }
+    },
+    required: ["feedback", "suggested_prompt"]
 };
 
 
@@ -868,8 +881,97 @@ function applyCatalyst(text: string) {
     showNotification('Suggestion added to your prompt!');
 }
 
+// 7. Negative Prompt Analysis Logic
 
-// 7. Saved Prompts Logic
+/** Analyzes the negative prompt for improvements */
+async function analyzeNegativePrompt() {
+    const mainPrompt = promptInput.value.trim();
+    const negativePrompt = negativePromptInput.value.trim();
+
+    if (!negativePrompt) {
+        showNotification("Please enter something in the exclusion criteria to analyze.");
+        return;
+    }
+     if (!mainPrompt) {
+        showNotification("Please provide a main prompt for context before analyzing exclusions.");
+        return;
+    }
+
+    if (!negativePromptFeedback) return;
+
+    analyzeNegativeBtn.disabled = true;
+    analyzeNegativeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    negativePromptFeedback.style.display = 'block';
+    negativePromptFeedback.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing...</div>`;
+
+    try {
+        const generationPrompt = `You are an expert AI Video Prompt Engineer. Analyze the provided main prompt and its corresponding negative prompt (exclusion criteria). Your goal is to refine the negative prompt for better results from a text-to-video model.
+
+        1.  **Identify Weak Terms:** Find vague terms like "bad," "ugly," "low quality" and suggest specific, descriptive alternatives. For example, instead of "bad anatomy," suggest "deformed hands, extra limbs, distorted facial features."
+        2.  **Check for Contradictions:** Ensure the negative prompt doesn't accidentally contradict the main prompt's intent.
+        3.  **Anticipate Issues:** Based on the main prompt, suggest common AI artifacts to exclude. For example, if the main prompt asks for "a person walking," the negative prompt could include "unnatural gait, sliding feet."
+        4.  **Consolidate and Clarify:** Combine related ideas and make the prompt clear and concise.
+
+        Return your analysis in a structured JSON format with two keys: "feedback" (a brief paragraph explaining your reasoning and suggestions) and "suggested_prompt" (the complete, improved negative prompt string).
+
+        **Main Prompt:** "${mainPrompt}"
+        **Current Negative Prompt:** "${negativePrompt}"`;
+        
+        const response = await ai.models.generateContent({
+            model: chatModel,
+            contents: generationPrompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: negativePromptAnalysisSchema,
+            },
+        });
+
+        const analysisData = JSON.parse(response.text);
+        displayNegativePromptFeedback(analysisData);
+
+    } catch (error) {
+        console.error("Error analyzing negative prompt:", error);
+        negativePromptFeedback.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Failed to analyze. Please try again.</div>`;
+    } finally {
+        analyzeNegativeBtn.disabled = false;
+        analyzeNegativeBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Analyze';
+    }
+}
+
+/** Displays the feedback from the negative prompt analysis */
+function displayNegativePromptFeedback(data: { feedback: string, suggested_prompt: string }) {
+    if (!negativePromptFeedback) return;
+    negativePromptFeedback.innerHTML = '';
+    negativePromptFeedback.style.display = 'block';
+
+    const feedbackParagraph = document.createElement('p');
+    feedbackParagraph.innerHTML = `<strong>Analysis:</strong> ${data.feedback}`;
+
+    const suggestionHeader = document.createElement('h4');
+    suggestionHeader.textContent = 'Suggested Improvement:';
+    suggestionHeader.style.marginTop = '10px';
+    suggestionHeader.style.marginBottom = '5px';
+
+    const suggestedPromptText = document.createElement('p');
+    suggestedPromptText.className = 'suggested-prompt-text';
+    suggestedPromptText.textContent = data.suggested_prompt;
+
+    const useBtn = document.createElement('button');
+    useBtn.className = 'action-btn';
+    useBtn.innerHTML = `<i class="fas fa-check"></i> Use Suggestion`;
+    useBtn.onclick = () => {
+        negativePromptInput.value = data.suggested_prompt;
+        showNotification('Suggested prompt applied!');
+    };
+    
+    negativePromptFeedback.appendChild(feedbackParagraph);
+    negativePromptFeedback.appendChild(suggestionHeader);
+    negativePromptFeedback.appendChild(suggestedPromptText);
+    negativePromptFeedback.appendChild(useBtn);
+}
+
+
+// 8. Saved Prompts Logic
 
 /** Gets all saved prompts from localStorage */
 function getSavedPrompts(): any[] {
@@ -937,7 +1039,7 @@ function handleDeletePrompt(promptId: number) {
 }
 
 
-// 8. Event listeners & Initialization
+// 9. Event listeners & Initialization
 function init() {
     generateBtn.addEventListener('click', handleGeneratePrompt);
     sendChatBtn.addEventListener('click', handleSendMessage);
@@ -949,6 +1051,7 @@ function init() {
     generateVideoBtn.addEventListener('click', handleGenerateVideo);
     imageUploadInput.addEventListener('change', handleImageUpload);
     analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
+    analyzeNegativeBtn.addEventListener('click', analyzeNegativePrompt);
 
     // NEW: Viewfinder control listeners
     zoomSlider.addEventListener('input', applyZoom);
