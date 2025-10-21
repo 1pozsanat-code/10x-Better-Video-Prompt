@@ -31,6 +31,10 @@ const zoomSlider = document.getElementById('zoom-slider') as HTMLInputElement;
 const panSlider = document.getElementById('pan-slider') as HTMLInputElement;
 const tiltSlider = document.getElementById('tilt-slider') as HTMLInputElement;
 
+// NEW Scene Catalysts selector
+const catalystsContainer = document.getElementById('catalysts-content');
+
+
 // 3. State variables
 let chat: Chat;
 let currentEnhancedPrompt: object | null = null;
@@ -162,6 +166,23 @@ const tiltedDescriptionsSchema = {
     required: ["subject", "setting", "environment"]
 };
 
+const catalystSchema = {
+    type: Type.OBJECT,
+    properties: {
+        antagonist_actions: {
+            type: Type.ARRAY,
+            description: "An array of 2-3 dynamic and engaging actions the antagonist could perform. These should be short, evocative phrases.",
+            items: { type: Type.STRING }
+        },
+        environmental_events: {
+            type: Type.ARRAY,
+            description: "An array of 2-3 dynamic environmental events or effects that could occur in the scene. These should be short, evocative phrases.",
+            items: { type: Type.STRING }
+        }
+    },
+    required: ["antagonist_actions", "environmental_events"]
+};
+
 
 // 4. Helper functions
 
@@ -279,6 +300,13 @@ function displayEnhancedPrompt(promptData: any) {
     
     generateVideoBtn.disabled = false;
     setupInteractiveViewfinder(promptData.scene);
+
+    // --- Trigger catalyst generation ---
+    if (catalystsContainer) {
+        catalystsContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Generating creative suggestions...</div>`;
+        catalystsContainer.classList.add('placeholder');
+        generateSceneCatalysts(promptData.scene);
+    }
 }
 
 /** Displays the alternative prompts from image analysis */
@@ -534,6 +562,10 @@ async function handleGeneratePrompt() {
         viewfinderDisplay.innerHTML = '<div class="placeholder">Generate an enhanced prompt to activate the viewfinder.</div>';
         viewfinderControls.style.display = 'none';
     }
+    if (catalystsContainer) {
+        catalystsContainer.innerHTML = '<div class="placeholder">Generate an enhanced prompt to see dynamic suggestions.</div>';
+        catalystsContainer.classList.add('placeholder');
+    }
     generateVideoBtn.disabled = true;
     currentEnhancedPrompt = null;
 
@@ -686,7 +718,97 @@ function handleGenerateVideo() {
 }
 
 
-// 6. Saved Prompts Logic
+// 6. Scene Catalysts Logic
+/** Generates dynamic suggestions for the scene */
+async function generateSceneCatalysts(scene: any) {
+    if (!scene) {
+        if (catalystsContainer) catalystsContainer.innerHTML = '<div class="placeholder">Scene data is missing for suggestions.</div>';
+        return;
+    }
+
+    try {
+        const generationPrompt = `Based on the following video scene, generate a JSON object with creative suggestions for dynamic events. Suggest 2-3 "antagonist_actions" and 2-3 "environmental_events". These should be short, evocative phrases that could be added to the prompt to make it more exciting.
+
+Scene Subject: ${scene.subject}
+Scene Setting: ${scene.setting}
+Scene Antagonist: ${scene.antagonists || 'None'}
+Scene Environment: ${scene.environment}
+`;
+        const response = await ai.models.generateContent({
+            model: chatModel, // fast model is fine for this
+            contents: generationPrompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: catalystSchema,
+            },
+        });
+        const catalystData = JSON.parse(response.text);
+        displaySceneCatalysts(catalystData);
+    } catch (error) {
+        console.error('Error generating scene catalysts:', error);
+        if (catalystsContainer) {
+            catalystsContainer.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Failed to generate suggestions.</div>`;
+        }
+    }
+}
+
+/** Displays the generated scene catalysts in the UI */
+function displaySceneCatalysts(catalystData: any) {
+    if (!catalystsContainer) return;
+    catalystsContainer.innerHTML = '';
+    catalystsContainer.classList.remove('placeholder');
+
+    const grid = document.createElement('div');
+    grid.className = 'catalysts-grid';
+
+    const antagonistCol = document.createElement('div');
+    antagonistCol.className = 'catalyst-column';
+    antagonistCol.innerHTML = `<h3><i class="fas fa-skull-crossbones"></i> Antagonist Actions</h3>`;
+
+    const environmentCol = document.createElement('div');
+    environmentCol.className = 'catalyst-column';
+    environmentCol.innerHTML = `<h3><i class="fas fa-wind"></i> Environmental Events</h3>`;
+
+    catalystData.antagonist_actions?.forEach((action: string) => {
+        const btn = document.createElement('button');
+        btn.className = 'catalyst-btn';
+        btn.textContent = action;
+        btn.onclick = () => applyCatalyst(action);
+        antagonistCol.appendChild(btn);
+    });
+
+    catalystData.environmental_events?.forEach((event: string) => {
+        const btn = document.createElement('button');
+        btn.className = 'catalyst-btn';
+        btn.textContent = event;
+        btn.onclick = () => applyCatalyst(event);
+        environmentCol.appendChild(btn);
+    });
+    
+    if (antagonistCol.childElementCount <= 1) { // h3 is one child
+         antagonistCol.innerHTML += '<p class="no-catalyst">No specific antagonist actions suggested.</p>';
+    }
+    if (environmentCol.childElementCount <= 1) {
+         environmentCol.innerHTML += '<p class="no-catalyst">No specific environmental events suggested.</p>';
+    }
+
+    grid.appendChild(antagonistCol);
+    grid.appendChild(environmentCol);
+    catalystsContainer.appendChild(grid);
+}
+
+/** Adds a catalyst suggestion to the main prompt input */
+function applyCatalyst(text: string) {
+    const currentPrompt = promptInput.value.trim();
+    // Appends the suggestion, adding a comma if there's existing text.
+    promptInput.value = currentPrompt ? `${currentPrompt}, ${text}` : text;
+    promptInput.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showNotification('Suggestion added to your prompt!');
+}
+
+
+// 7. Saved Prompts Logic
 
 /** Gets all saved prompts from localStorage */
 function getSavedPrompts(): any[] {
@@ -754,7 +876,7 @@ function handleDeletePrompt(promptId: number) {
 }
 
 
-// 7. Event listeners & Initialization
+// 8. Event listeners & Initialization
 function init() {
     generateBtn.addEventListener('click', handleGeneratePrompt);
     sendChatBtn.addEventListener('click', handleSendMessage);
