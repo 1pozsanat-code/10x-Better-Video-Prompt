@@ -17,6 +17,8 @@ const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLBu
 const videoPreview = document.querySelector('.video-preview');
 const sceneVisualizationContainer = document.getElementById('scene-visualization');
 const stylePresetsContainer = document.getElementById('style-presets');
+const savedPromptsContainer = document.getElementById('saved-prompts-container');
+
 
 // Image Upload Elements
 const imageUploadInput = document.getElementById('image-upload-input') as HTMLInputElement;
@@ -30,6 +32,7 @@ let chat: Chat;
 let currentEnhancedPrompt: object | null = null;
 let uploadedImageBase64: { mimeType: string, data: string } | null = null;
 let selectedStylePreset: string | null = null;
+const SAVED_PROMPTS_KEY = 'ai-video-prompts';
 
 // JSON schema for the enhanced prompt
 const videoPromptSchema = {
@@ -124,21 +127,36 @@ const alternativePromptsSchema = {
     }
 };
 
+const sceneSuggestionsSchema = {
+    type: Type.ARRAY,
+    description: "An array of 3 specific visual elements for the scene.",
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            element: { type: Type.STRING, description: "The name of the visual element (e.g., 'Holographic Koi Fish')." },
+            description: { type: Type.STRING, description: "A brief one-sentence description of the element." }
+        },
+        required: ["element", "description"]
+    }
+};
+
 
 // 4. Helper functions
 
 /** Shows a notification message */
-function showNotification() {
-  copyNotification.classList.add('show');
-  setTimeout(() => {
-    copyNotification.classList.remove('show');
-  }, 2000);
+function showNotification(message: string = 'Copied to clipboard!') {
+    const span = copyNotification.querySelector('span');
+    if (span) span.textContent = message;
+    copyNotification.classList.add('show');
+    setTimeout(() => {
+        copyNotification.classList.remove('show');
+    }, 2000);
 }
 
 /** Copies text to the clipboard */
 function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text).then(() => {
-    showNotification();
+    showNotification('Prompt copied to clipboard!');
   }).catch(err => {
     console.error('Failed to copy text: ', err);
     alert('Failed to copy');
@@ -169,6 +187,7 @@ function displayEnhancedPrompt(promptData: any) {
     jsonHeader.innerHTML = `
         <div class="prompt-title">Enhanced Prompt (JSON)</div>
         <div class="prompt-actions">
+            <button class="action-btn" id="save-prompt-btn"><i class="fas fa-save"></i> Save</button>
             <button class="action-btn" id="copy-json-btn"><i class="fas fa-copy"></i> Copy</button>
         </div>
     `;
@@ -217,6 +236,20 @@ function displayEnhancedPrompt(promptData: any) {
     
     // --- Add event listeners ---
     (promptCard.querySelector('#copy-json-btn') as HTMLButtonElement).onclick = () => copyToClipboard(JSON.stringify(promptData, null, 2));
+
+    (promptCard.querySelector('#save-prompt-btn') as HTMLButtonElement).onclick = () => {
+        const prompts = getSavedPrompts();
+        const newPrompt = {
+            id: Date.now(),
+            title: `${promptData.scene?.subject || 'Untitled'} - ${promptData.meta?.style || 'Default Style'}`,
+            data: promptData
+        };
+        prompts.unshift(newPrompt); // Add to the beginning of the list
+        savePrompts(prompts);
+        renderSavedPrompts();
+        showNotification('Prompt saved successfully!');
+    };
+
 
     // --- Generate and display simple prompt ---
     const copySimpleBtn = promptCard.querySelector('#copy-simple-btn') as HTMLButtonElement;
@@ -293,11 +326,63 @@ const iconMap: { [key: string]: string } = {
     'action': 'fa-bolt', 'escape': 'fa-running', 'chase': 'fa-running',
 };
 
+/** Generates and displays scene element suggestions */
+async function getAndDisplaySceneSuggestions(scene: any, container: HTMLElement) {
+    try {
+        const suggestionPrompt = `Based on the following scene description, suggest 3 specific, tangible, and visually interesting elements or objects that would exist in this environment. Focus on small details that enhance the atmosphere. Return an empty array if no specific suggestions come to mind.
+
+Setting: ${scene.setting}
+Subject: ${scene.subject}
+Environment: ${scene.environment}`;
+
+        const response = await ai.models.generateContent({
+            model: chatModel, // Use the faster model for this creative task
+            contents: suggestionPrompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: sceneSuggestionsSchema,
+            },
+        });
+        
+        const suggestions = JSON.parse(response.text);
+
+        // Clear loading placeholder
+        container.innerHTML = ''; 
+        
+        if (!suggestions || suggestions.length === 0) {
+             const parent = container.parentElement;
+             if (parent) parent.style.display = 'none'; // Hide the whole suggestions section if there are no suggestions
+             return;
+        }
+
+        suggestions.forEach((sug: {element: string, description: string}) => {
+            const suggestionElement = document.createElement('div');
+            suggestionElement.className = 'scene-element suggestion'; 
+            suggestionElement.title = sug.description; // Tooltip for full description
+            suggestionElement.innerHTML = `
+                <div class="scene-icon"><i class="fas fa-lightbulb"></i></div>
+                <div class="scene-title">${sug.element}</div>
+                <div class="scene-desc">${sug.description}</div>
+            `;
+            container.appendChild(suggestionElement);
+        });
+
+    } catch (error) {
+        console.error('Error generating scene suggestions:', error);
+        container.innerHTML = '<div class="placeholder" style="color: #ff8a80; text-align: center; width: 100%;">Could not generate suggestions.</div>';
+    }
+}
+
+
 /** Updates the scene visualization based on the generated prompt */
 function updateSceneVisualization(scene: any) {
     sceneVisualizationContainer.innerHTML = '';
     if (!scene) return;
     
+    // --- Render Core Elements ---
+    const coreElementsContainer = document.createElement('div');
+    coreElementsContainer.className = 'scene-elements-grid';
+
     const elements: {title: string, desc: string}[] = [];
     if (scene.subject) elements.push({ title: 'Subject', desc: scene.subject });
     if (scene.setting) elements.push({ title: 'Setting', desc: scene.setting });
@@ -321,8 +406,30 @@ function updateSceneVisualization(scene: any) {
             <div class="scene-title">${el.title}</div>
             <div class="scene-desc">${el.desc}</div>
         `;
-        sceneVisualizationContainer.appendChild(sceneElement);
+        coreElementsContainer.appendChild(sceneElement);
     });
+    sceneVisualizationContainer.appendChild(coreElementsContainer);
+
+    // --- Render Suggested Elements ---
+    if (scene.setting && scene.subject && scene.environment) {
+        const suggestionsSection = document.createElement('div');
+        suggestionsSection.className = 'suggestions-section';
+        
+        const suggestionsHeader = document.createElement('h3');
+        suggestionsHeader.className = 'suggestions-title';
+        suggestionsHeader.innerHTML = `<i class="fas fa-magic"></i> Suggested Details`;
+        suggestionsSection.appendChild(suggestionsHeader);
+
+        const suggestionsContainer = document.createElement('div');
+        suggestionsContainer.className = 'scene-elements-grid';
+        suggestionsContainer.innerHTML = `<div class="placeholder" style="text-align: center; width: 100%;"><i class="fas fa-spinner fa-spin"></i> Generating ideas...</div>`;
+        suggestionsSection.appendChild(suggestionsContainer);
+
+        sceneVisualizationContainer.appendChild(suggestionsSection);
+
+        // Asynchronously fetch and display suggestions
+        getAndDisplaySceneSuggestions(scene, suggestionsContainer);
+    }
 }
 
 // 5. Core logic functions
@@ -491,46 +598,50 @@ function handleGenerateVideo() {
 }
 
 
-// 6. Event listeners
+// 6. Saved Prompts Logic
+
+/** Gets all saved prompts from localStorage */
+function getSavedPrompts(): any[] {
+    const promptsJson = localStorage.getItem(SAVED_PROMPTS_KEY);
+    return promptsJson ? JSON.parse(promptsJson) : [];
+}
+
+/** Saves an array of prompts to localStorage */
+function savePrompts(prompts: any[]) {
+    localStorage.setItem(SAVED_PROMPTS_KEY, JSON.stringify(prompts));
+}
+
+/** Renders the list of saved prompts in the UI */
+function renderSavedPrompts() {
+    const prompts = getSavedPrompts();
+    savedPromptsContainer.innerHTML = ''; // Clear existing list
+
+    if (prompts.length === 0) {
+        savedPromptsContainer.innerHTML = '<div class="placeholder">No saved prompts yet.</div>';
+        return;
+    }
+
+    prompts.forEach(prompt => {
+        const item = document.createElement('div');
+        item.className = 'saved-prompt-item';
+        item.innerHTML = `
+            <div class="saved-prompt-info">
+                <div class="saved-prompt-title" title="${prompt.title}">${prompt.title}</div>
+                <div class="saved-prompt-date">${new Date(prompt.id).toLocaleString()}</div>
+            </div>
+            <div class="saved-prompt-actions">
+                <button class="action-btn load-btn" data-id="${prompt.id}"><i class="fas fa-folder-open"></i> Load</button>
+                <button class="action-btn delete-btn" data-id="${prompt.id}"><i class="fas fa-trash"></i> Delete</button>
+            </div>
+        `;
+        savedPromptsContainer.appendChild(item);
+    });
+}
+
+
+// 7. Event listeners
 generateBtn.addEventListener('click', handleGeneratePrompt);
 sendChatBtn.addEventListener('click', handleSendMessage);
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        handleSendMessage();
-    }
-});
-generateVideoBtn.addEventListener('click', handleGenerateVideo);
-imageUploadInput.addEventListener('change', handleImageUpload);
-analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
-
-stylePresetsContainer.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const button = target.closest('.style-preset-btn') as HTMLButtonElement;
-    if (!button) return;
-
-    // Remove active class from all buttons
-    stylePresetsContainer.querySelectorAll('.style-preset-btn').forEach(btn => btn.classList.remove('active'));
-
-    const style = button.dataset.style;
-    if (selectedStylePreset === style) {
-        // Deselect if clicking the active one again
-        selectedStylePreset = null;
-    } else {
-        selectedStylePreset = style;
-        button.classList.add('active');
-    }
-});
-
-
-// 7. Initialization logic
-function initialize() {
-    chat = ai.chats.create({
-        model: chatModel,
-        config: {
-            systemInstruction: "You are a friendly and concise AI assistant specializing in video prompt engineering. Help users refine and improve their video prompts. Answer questions about cinematography, scene composition, and suggest creative ideas. If asked to modify a prompt, explain what you would change instead of providing a new JSON block."
-        },
-    });
-    console.log("App initialized.");
-}
-
-initialize();
+        handleSendMessage

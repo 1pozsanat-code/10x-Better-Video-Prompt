@@ -393,20 +393,28 @@ button:disabled {
 }
 
 .scene-visualization {
-    display: flex;
-    justify-content: space-between;
     margin-top: 20px;
+}
+
+.scene-elements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 15px;
-    flex-wrap: wrap;
 }
 
 .scene-element {
-    flex: 1;
-    min-width: 100px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     padding: 15px;
     text-align: center;
+    border-left: 3px solid transparent;
+    transition: transform 0.2s, background 0.2s;
+    cursor: default;
+}
+
+.scene-element:hover {
+    transform: translateY(-3px);
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .scene-icon {
@@ -423,7 +431,38 @@ button:disabled {
 .scene-desc {
     font-size: 0.9rem;
     opacity: 0.8;
+    min-height: 42px; /* approx 3 lines of text */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+.suggestions-section {
+    margin-top: 25px;
+}
+
+.suggestions-title {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 20px;
+}
+
+.scene-element.suggestion {
+    background: rgba(20, 50, 60, 0.5); 
+    border-left-color: #7be8feb4;
+}
+
+.scene-element.suggestion .scene-icon {
+    color: #7be8feb4;
+}
+
 
 .style-presets {
     display: flex;
@@ -457,4 +496,63 @@ button:disabled {
     font-weight: 600;
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 126, 95, 0.4);
+}
+
+.saved-prompts-section {
+    margin-top: 30px;
+}
+
+.saved-prompt-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 3px solid #7be8feb4;
+    transition: background 0.2s;
+}
+
+.saved-prompt-item:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+
+.saved-prompt-info {
+    flex-grow: 1;
+    margin-right: 15px;
+    overflow: hidden;
+}
+
+.saved-prompt-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saved-prompt-date {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.saved-prompt-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.saved-prompt-actions .action-btn {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.saved-prompt-actions .action-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.saved-prompt-actions .delete-btn:hover {
+    background: rgba(255, 99, 132, 0.4);
+    color: white;
 }
