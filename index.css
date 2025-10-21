@@ -333,6 +333,10 @@ button:disabled {
     border-bottom-left-radius: 5px;
 }
 
+.bot-message.thinking {
+    max-width: fit-content;
+}
+
 .chat-input {
     display: flex;
     gap: 10px;

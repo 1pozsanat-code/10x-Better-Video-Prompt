@@ -698,6 +698,26 @@ async function handleAnalyzeImage() {
     }
 }
 
+/** Summarizes the current prompt to provide context for the chat assistant */
+async function summarizePromptForChat(promptData: any): Promise<string> {
+    try {
+        const prompt = `Summarize the following detailed video prompt JSON into a short paragraph (under 80 words). This summary will be used as context for a chat assistant helping a user refine the prompt. Focus on the core concepts: the subject, setting, style, and key actions or cinematic elements.
+
+JSON Prompt:
+${JSON.stringify(promptData, null, 2)}`;
+
+        const response = await ai.models.generateContent({
+            model: chatModel, // Use the faster model for summarization
+            contents: prompt,
+        });
+
+        return response.text.trim();
+    } catch (error) {
+        console.error('Error summarizing prompt for chat:', error);
+        // Fallback to a simpler, structured summary if API fails
+        return `A video about "${promptData.scene?.subject}" in a "${promptData.scene?.setting}" setting, with a "${promptData.meta?.style}" style. Key cinematography includes ${promptData.cinematography?.camera_movement}.`;
+    }
+}
 
 /** Handles sending a chat message */
 async function handleSendMessage() {
@@ -708,16 +728,28 @@ async function handleSendMessage() {
     chatInput.value = '';
     sendChatBtn.disabled = true;
 
+    // Add a thinking indicator
+    const thinkingMessageEl = document.createElement('div');
+    thinkingMessageEl.className = 'message bot-message thinking';
+    thinkingMessageEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    chatMessagesContainer.appendChild(thinkingMessageEl);
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+
     try {
         let fullContext = `User is asking for help with a video prompt.`;
         if (currentEnhancedPrompt) {
-            fullContext += `\n\nHere is the current enhanced prompt they are working with:\n${JSON.stringify(currentEnhancedPrompt, null, 2)}`;
+            const promptSummary = await summarizePromptForChat(currentEnhancedPrompt);
+            fullContext += `\n\nThey are working with a prompt summarized as: "${promptSummary}"`;
         }
         
         const response = await chat.sendMessage({ message: `${fullContext}\n\nUser's question: "${message}"` });
+        
+        thinkingMessageEl.remove(); // Remove thinking indicator
         addMessage(response.text, 'bot');
+
     } catch (error) {
         console.error('Chat error:', error);
+        thinkingMessageEl.remove(); // Remove thinking indicator on error too
         addMessage('Sorry, I had trouble connecting. Please try again.', 'bot');
     } finally {
         sendChatBtn.disabled = false;
