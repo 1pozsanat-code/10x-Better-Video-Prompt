@@ -716,20 +716,11 @@ button:disabled {
     color: rgba(255, 255, 255, 0.5);
 }
 
-.style-example-prompt, .style-example-prompt-fallback {
-    font-family: 'Georgia', serif;
-    font-style: italic;
-    font-size: 0.9rem;
-    line-height: 1.4;
-    color: rgba(255, 255, 255, 0.85);
-}
-
-.style-example-prompt-fallback {
-    font-style: normal;
+.style-visual-description, .style-visual-description-fallback {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-weight: 600;
-    font-size: 1.1rem;
-    opacity: 0.7;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .style-presets {

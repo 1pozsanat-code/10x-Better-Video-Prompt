@@ -229,13 +229,13 @@ const negativePromptAnalysisSchema = {
     required: ["feedback", "suggested_prompt"]
 };
 
-const stylePromptsSchema = {
+const styleVisualsSchema = {
     type: Type.OBJECT,
     properties: {
-        cinematic: { type: Type.STRING, description: "An example prompt for the Cinematic style." },
-        anime: { type: Type.STRING, description: "An example prompt for the Anime style." },
-        photorealistic: { type: Type.STRING, description: "An example prompt for the Photorealistic style." },
-        abstract: { type: Type.STRING, description: "An example prompt for the Abstract style." }
+        cinematic: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Cinematic style." },
+        anime: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Anime style." },
+        photorealistic: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Photorealistic style." },
+        abstract: { type: Type.STRING, description: "A brief, evocative description of the key visual characteristics of the Abstract style." }
     },
     required: ["cinematic", "anime", "photorealistic", "abstract"]
 };
@@ -708,33 +708,33 @@ async function generateAndDisplayExamplePrompts() {
     });
 
     try {
-        const prompt = `Generate a short, creative, and concrete example prompt (under 15 words) for an AI image/video generator for each of the following styles. These examples should be evocative and clearly represent the style. Return a JSON object with keys 'cinematic', 'anime', 'photorealistic', 'abstract' where each value is the example prompt string.`;
+        const prompt = `Generate a short, evocative description (under 20 words) of the key visual characteristics for each of the following styles. Focus on visual elements like lighting, color, texture, and composition. Return a JSON object with keys 'cinematic', 'anime', 'photorealistic', 'abstract' where each value is the description string.`;
 
         const response = await ai.models.generateContent({
             model: chatModel,
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: stylePromptsSchema,
+                responseSchema: styleVisualsSchema,
             },
         });
 
-        const prompts = JSON.parse(response.text);
+        const descriptions = JSON.parse(response.text);
 
-        Object.entries(prompts).forEach(([key, value]) => {
+        Object.entries(descriptions).forEach(([key, value]) => {
             const container = visualContainers[key as keyof typeof visualContainers];
             if (container) {
-                container.innerHTML = `<p class="style-example-prompt">“${value}”</p>`;
+                container.innerHTML = `<p class="style-visual-description">${value}</p>`;
             }
         });
 
     } catch (error) {
         console.error("Error generating style example prompts:", error);
         // Fallback to simple text if API fails
-        if (visualContainers.cinematic) visualContainers.cinematic.innerHTML = `<p class="style-example-prompt-fallback">Cinematic</p>`;
-        if (visualContainers.anime) visualContainers.anime.innerHTML = `<p class="style-example-prompt-fallback">Anime</p>`;
-        if (visualContainers.photorealistic) visualContainers.photorealistic.innerHTML = `<p class="style-example-prompt-fallback">Photorealistic</p>`;
-        if (visualContainers.abstract) visualContainers.abstract.innerHTML = `<p class="style-example-prompt-fallback">Abstract</p>`;
+        if (visualContainers.cinematic) visualContainers.cinematic.innerHTML = `<p class="style-visual-description-fallback">High contrast, dramatic lighting, film grain.</p>`;
+        if (visualContainers.anime) visualContainers.anime.innerHTML = `<p class="style-visual-description-fallback">Vibrant colors, cel-shaded characters, dynamic lines.</p>`;
+        if (visualContainers.photorealistic) visualContainers.photorealistic.innerHTML = `<p class="style-visual-description-fallback">Lifelike textures, accurate lighting, realistic detail.</p>`;
+        if (visualContainers.abstract) visualContainers.abstract.innerHTML = `<p class="style-visual-description-fallback">Geometric shapes, bold color fields, non-representational forms.</p>`;
     }
 }
 
