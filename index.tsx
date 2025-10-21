@@ -201,6 +201,17 @@ const negativePromptAnalysisSchema = {
     required: ["feedback", "suggested_prompt"]
 };
 
+const stylePromptsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        cinematic: { type: Type.STRING, description: "An example prompt for the Cinematic style." },
+        anime: { type: Type.STRING, description: "An example prompt for the Anime style." },
+        photorealistic: { type: Type.STRING, description: "An example prompt for the Photorealistic style." },
+        abstract: { type: Type.STRING, description: "An example prompt for the Abstract style." }
+    },
+    required: ["cinematic", "anime", "photorealistic", "abstract"]
+};
+
 
 // 4. Helper functions
 
@@ -563,6 +574,53 @@ function updateTiltDescriptions(descriptions: any) {
             descEl.textContent = currentSceneData.antagonists;
         }
     });
+}
+
+/** Generates and displays example prompts for each style preset */
+async function generateAndDisplayExamplePrompts() {
+    const visualContainers: { [key: string]: HTMLElement | null } = {
+        cinematic: document.getElementById('style-visual-cinematic'),
+        anime: document.getElementById('style-visual-anime'),
+        photorealistic: document.getElementById('style-visual-photorealistic'),
+        abstract: document.getElementById('style-visual-abstract'),
+    };
+
+    // Add placeholders
+    Object.values(visualContainers).forEach(container => {
+        if (container) {
+            container.innerHTML = `<div class="placeholder-text"><i class="fas fa-spinner fa-spin"></i></div>`;
+        }
+    });
+
+    try {
+        const prompt = `Generate a short, creative, and concrete example prompt (under 15 words) for an AI image/video generator for each of the following styles. These examples should be evocative and clearly represent the style. Return a JSON object with keys 'cinematic', 'anime', 'photorealistic', 'abstract' where each value is the example prompt string.`;
+
+        const response = await ai.models.generateContent({
+            model: chatModel,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: stylePromptsSchema,
+            },
+        });
+
+        const prompts = JSON.parse(response.text);
+
+        Object.entries(prompts).forEach(([key, value]) => {
+            const container = visualContainers[key as keyof typeof visualContainers];
+            if (container) {
+                container.innerHTML = `<p class="style-example-prompt">“${value}”</p>`;
+            }
+        });
+
+    } catch (error) {
+        console.error("Error generating style example prompts:", error);
+        // Fallback to simple text if API fails
+        if (visualContainers.cinematic) visualContainers.cinematic.innerHTML = `<p class="style-example-prompt-fallback">Cinematic</p>`;
+        if (visualContainers.anime) visualContainers.anime.innerHTML = `<p class="style-example-prompt-fallback">Anime</p>`;
+        if (visualContainers.photorealistic) visualContainers.photorealistic.innerHTML = `<p class="style-example-prompt-fallback">Photorealistic</p>`;
+        if (visualContainers.abstract) visualContainers.abstract.innerHTML = `<p class="style-example-prompt-fallback">Abstract</p>`;
+    }
 }
 
 
@@ -1097,6 +1155,9 @@ function init() {
 
     // Initial render of saved prompts
     renderSavedPrompts();
+
+    // Generate and display example prompts for styles
+    generateAndDisplayExamplePrompts();
 }
 
 init();
