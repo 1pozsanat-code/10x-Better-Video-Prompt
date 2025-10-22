@@ -20,6 +20,7 @@ const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLBu
 const videoPreview = document.querySelector('.video-preview');
 const stylePresetsContainer = document.getElementById('style-presets');
 const savedPromptsContainer = document.getElementById('saved-prompts-container');
+const searchSuggestionsContainer = document.getElementById('search-suggestions-container');
 
 // Image Upload Elements
 const imageUploadInput = document.getElementById('image-upload-input') as HTMLInputElement;
@@ -73,6 +74,7 @@ let addedSoundEffects: string[] = [];
 const SAVED_PROMPTS_KEY = 'ai-video-prompts';
 let firstFrameBase64: string | null = null;
 let lastFrameBase64: string | null = null;
+let searchSuggestionTimeout: number | null = null;
 
 // Viewfinder state
 let currentSceneData: any | null = null;
@@ -1348,9 +1350,129 @@ async function generateImageFrame(type: 'first' | 'last') {
     }
 }
 
+/** Clears and hides the search suggestions container */
+function clearSearchSuggestions() {
+    if (searchSuggestionsContainer) {
+        searchSuggestionsContainer.style.display = 'none';
+        searchSuggestionsContainer.innerHTML = '';
+    }
+}
+
+/** Renders search suggestions in the UI */
+function displaySearchSuggestions(suggestions: string[], sources: any[]) {
+    if (!searchSuggestionsContainer || suggestions.length === 0) {
+        clearSearchSuggestions();
+        return;
+    }
+
+    searchSuggestionsContainer.innerHTML = `
+        <div class="suggestions-header">
+            <span class="suggestions-title"><i class="fas fa-lightbulb"></i> Cinematic Suggestions</span>
+            <button class="suggestions-close-btn" id="close-suggestions-btn" title="Close">&times;</button>
+        </div>
+        <div class="suggestions-list" id="suggestions-list">
+        </div>
+    `;
+    
+    const suggestionsList = searchSuggestionsContainer.querySelector('#suggestions-list');
+
+    suggestions.forEach(term => {
+        const btn = document.createElement('button');
+        btn.className = 'suggestion-btn';
+        btn.textContent = term;
+        btn.onclick = () => {
+            promptInput.value = (promptInput.value.trim().endsWith(',') ? promptInput.value.trim() : promptInput.value.trim() + ',') + ` ${term}`;
+            promptInput.focus();
+            clearSearchSuggestions();
+        };
+        suggestionsList.appendChild(btn);
+    });
+
+    if (sources.length > 0) {
+        const sourcesHtml = sources.map((source: any, index: number) => {
+            if (source.web?.uri) {
+                 return `<a href="${source.web.uri}" target="_blank" rel="noopener noreferrer">Source ${index + 1}</a>`;
+            }
+            return '';
+        }).filter(Boolean).join('');
+        
+        if (sourcesHtml) {
+            const sourcesEl = document.createElement('div');
+            sourcesEl.className = 'suggestions-sources';
+            sourcesEl.innerHTML = `Sources: ${sourcesHtml}`;
+            searchSuggestionsContainer.appendChild(sourcesEl);
+        }
+    }
+    
+    // FIX: The result of querySelector is of type 'Element', which lacks an 'onclick' property.
+    // We check if the element is an HTMLElement to safely assign the event handler.
+    const closeBtn = searchSuggestionsContainer.querySelector('#close-suggestions-btn');
+    if (closeBtn instanceof HTMLElement) {
+        closeBtn.onclick = clearSearchSuggestions;
+    }
+    searchSuggestionsContainer.style.display = 'block';
+}
+
+
+/** Fetches cinematic term suggestions based on user input */
+async function getSearchSuggestions(query: string) {
+    if (!searchSuggestionsContainer) return;
+    searchSuggestionsContainer.style.display = 'block';
+    searchSuggestionsContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Finding cinematic terms...</div>`;
+
+    try {
+        const generationPrompt = `Analyze the following video prompt idea. Identify the single most niche, technical, or specific term within it. Based on that single term, use Google Search to find 3-4 related cinematic terms, techniques, or visual concepts that would enrich the prompt.
+- The output should be a single, comma-separated string of these terms.
+- Do not include the original term in the output.
+- If no specific term is found or no relevant cinematic concepts are available, respond with the exact text "N/A".
+
+User's prompt: "${query}"`;
+
+        const response = await ai.models.generateContent({
+           model: "gemini-2.5-flash",
+           contents: generationPrompt,
+           config: {
+             tools: [{googleSearch: {}}],
+           },
+        });
+        
+        const suggestionsText = response.text.trim();
+        const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+
+        if (suggestionsText && suggestionsText !== 'N/A') {
+            const suggestions = suggestionsText.split(',').map(s => s.trim()).filter(Boolean);
+            displaySearchSuggestions(suggestions, sources);
+        } else {
+            clearSearchSuggestions();
+        }
+
+    } catch (error) {
+        console.error('Error fetching search suggestions:', error);
+        clearSearchSuggestions();
+    }
+}
+
+/** Handles user typing in the prompt input to trigger suggestions */
+function handlePromptInput() {
+    if (searchSuggestionTimeout) {
+        clearTimeout(searchSuggestionTimeout);
+    }
+    const query = promptInput.value.trim();
+    
+    if (query.split(' ').length < 3) {
+        clearSearchSuggestions();
+        return;
+    }
+    
+    searchSuggestionTimeout = window.setTimeout(() => {
+        getSearchSuggestions(query);
+    }, 1500); // Wait 1.5 seconds after user stops typing
+}
+
 
 // 5. Main logic and event listeners
 async function main() {
+    clearSearchSuggestions(); // Clear any suggestions when generating
     const textPrompt = promptInput.value.trim();
     if (!textPrompt) {
         alert('Please enter a prompt.');
@@ -1499,6 +1621,8 @@ function init() {
             main();
         }
     });
+    promptInput.addEventListener('input', handlePromptInput);
+
 
     imageUploadInput.onchange = handleImageUpload;
     analyzeImageBtn.onclick = analyzeImage;
