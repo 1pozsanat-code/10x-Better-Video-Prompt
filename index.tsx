@@ -27,6 +27,7 @@ const imageUploadInput = document.getElementById('image-upload-input') as HTMLIn
 const imagePreview = document.getElementById('image-preview') as HTMLImageElement;
 const imagePlaceholder = document.getElementById('image-placeholder');
 const analyzeImageBtn = document.getElementById('analyze-image-btn') as HTMLButtonElement;
+const imageAnalysisHintInput = document.getElementById('image-analysis-hint') as HTMLTextAreaElement;
 
 // Viewfinder selectors
 const viewfinderDisplay = document.getElementById('viewfinder-display');
@@ -1547,12 +1548,19 @@ async function analyzeImage() {
     resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing image, this might take a moment...</div>';
 
     try {
+        const hint = imageAnalysisHintInput.value.trim();
+        let textPrompt = "Analyze this image in detail and suggest 3 creative video prompt ideas based on its content. The output must be a valid JSON object.";
+
+        if (hint) {
+            textPrompt += ` Use the following hint to guide the analysis and suggestions: "${hint}"`;
+        }
+
         const response = await ai.models.generateContent({
             model: chatModel, // Use a multimodal model for image analysis
             contents: {
                 parts: [
                     { inlineData: uploadedImageBase64 },
-                    { text: "Analyze this image in detail and suggest 3 creative video prompt ideas based on its content. The output must be a valid JSON object." }
+                    { text: textPrompt }
                 ],
             },
             config: {
