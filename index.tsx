@@ -295,6 +295,18 @@ const negativePromptAnalysisSchema = {
     required: ["feedback", "suggested_prompt"]
 };
 
+const vfxSuggestionsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        vfx_suggestions: {
+            type: Type.ARRAY,
+            description: "An array of 2-4 relevant and creative visual effect suggestions based on the mood and setting. Each suggestion should be a short, descriptive string.",
+            items: { type: Type.STRING }
+        }
+    },
+    required: ["vfx_suggestions"]
+};
+
 const styleVisualsSchema = {
     type: Type.OBJECT,
     properties: {
@@ -522,6 +534,17 @@ function displayEnhancedPrompt(promptData: any) {
         });
     }
 
+    // --- VFX Suggestions Section ---
+    const vfxSuggestionsContainer = document.createElement('div');
+    vfxSuggestionsContainer.className = 'vfx-suggestions-container placeholder';
+    vfxSuggestionsContainer.innerHTML = `
+        <strong><i class="fas fa-wand-magic-sparkles"></i> VFX Suggestions:</strong>
+        <div class="vfx-suggestion-loader">
+            <i class="fas fa-spinner fa-spin"></i> Finding ideas...
+        </div>
+    `;
+
+
     // --- Assemble Card ---
     promptCard.appendChild(jsonHeader);
     promptCard.appendChild(jsonContent);
@@ -533,6 +556,7 @@ function displayEnhancedPrompt(promptData: any) {
     if (sfxContainer.hasChildNodes()) {
         promptCard.appendChild(sfxContainer);
     }
+    promptCard.appendChild(vfxSuggestionsContainer);
     promptCard.appendChild(tagsContainer);
     
     resultsContainer.appendChild(promptCard);
@@ -558,6 +582,13 @@ function displayEnhancedPrompt(promptData: any) {
     const copySimpleBtn = promptCard.querySelector('#copy-simple-btn') as HTMLButtonElement;
     generateSimplePrompt(promptData, simpleTextContent, copySimpleBtn);
     
+    // --- Generate VFX Suggestions ---
+    if (promptData.meta?.mood && promptData.scene?.setting) {
+        generateVFXSuggestions(promptData.meta.mood, promptData.scene.setting, vfxSuggestionsContainer);
+    } else {
+        vfxSuggestionsContainer.style.display = 'none'; // Hide if not enough info
+    }
+
     generateVideoBtn.disabled = false;
     setupInteractiveViewfinder(promptData.scene);
 
@@ -970,6 +1001,79 @@ function applyTiltSuggestion(suggestion: { effect: string, description: string }
     updatePromptAndRefreshJSON('vfx_elements', newVfx);
     
     showNotification(`Applied: ${suggestion.effect}`);
+}
+
+/** Applies a VFX suggestion to the main enhanced prompt */
+function applyVFXSuggestion(suggestion: string, buttonElement: HTMLButtonElement) {
+    if (!currentEnhancedPrompt) {
+        showNotification("Error: No active prompt to apply suggestion to.");
+        return;
+    }
+    
+    const currentVfx = currentEnhancedPrompt.vfx_elements || [];
+    
+    if (currentVfx.includes(suggestion)) {
+        showNotification("Suggestion already applied!");
+        return;
+    }
+    
+    const newVfx = [...currentVfx, suggestion];
+    
+    updatePromptAndRefreshJSON('vfx_elements', newVfx);
+    
+    showNotification(`Applied: ${suggestion}`);
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = `<i class="fas fa-check"></i> Applied`;
+}
+
+/** Displays the generated VFX suggestions in the UI */
+function displayVFXSuggestions(suggestions: string[], container: HTMLElement) {
+    container.innerHTML = ''; // Clear loader
+    container.classList.remove('placeholder');
+
+    const header = document.createElement('strong');
+    header.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> VFX Suggestions:';
+    container.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'vfx-suggestions-list';
+
+    suggestions.forEach(suggestion => {
+        const btn = document.createElement('button');
+        btn.className = 'vfx-suggestion-btn';
+        btn.textContent = suggestion;
+        btn.onclick = () => applyVFXSuggestion(suggestion, btn);
+        list.appendChild(btn);
+    });
+
+    container.appendChild(list);
+}
+
+/** Fetches VFX suggestions from the AI */
+async function generateVFXSuggestions(mood: string, setting: string, container: HTMLElement) {
+    if (!mood || !setting) return;
+
+    try {
+        const prompt = `Based on a video scene with a mood of "${mood}" and a setting of "${setting}", suggest 2-4 highly relevant and creative visual effects (VFX). The suggestions should be short, descriptive phrases.`;
+        
+        const response = await ai.models.generateContent({
+            model: chatModel,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: vfxSuggestionsSchema,
+            },
+        });
+        const result = JSON.parse(response.text);
+        if (result.vfx_suggestions && result.vfx_suggestions.length > 0) {
+            displayVFXSuggestions(result.vfx_suggestions, container);
+        } else {
+            container.style.display = 'none'; // Hide if no suggestions
+        }
+    } catch (error) {
+        console.error("Error generating VFX suggestions:", error);
+        container.innerHTML = '<div class="vfx-suggestion-error">Could not load suggestions.</div>';
+    }
 }
 
 

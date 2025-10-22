@@ -987,6 +987,68 @@ button:disabled {
     box-shadow: none;
 }
 
+/* --- VFX Suggestion Styles --- */
+.vfx-suggestions-container {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vfx-suggestions-container.placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.vfx-suggestions-container strong {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.vfx-suggestion-loader {
+    font-size: 0.9em;
+}
+
+.vfx-suggestion-error {
+    font-size: 0.9em;
+    color: #ff8a80;
+}
+
+.vfx-suggestions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vfx-suggestion-btn {
+    background: rgba(123, 232, 254, 0.15);
+    border: 1px solid rgba(123, 232, 254, 0.3);
+    color: #c1faff;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.vfx-suggestion-btn:hover:not(:disabled) {
+    background: rgba(123, 232, 254, 0.3);
+    border-color: rgba(123, 232, 254, 0.6);
+    transform: translateY(-1px);
+}
+
+.vfx-suggestion-btn:disabled {
+    cursor: default;
+    background: rgba(46, 204, 113, 0.2);
+    border-color: rgba(46, 204, 113, 0.4);
+    color: #a3ffc7;
+    opacity: 1; /* Override default disabled opacity */
+}
+
+
 /* --- Frame Generation Styles --- */
 #frame-generation-container {
     margin-top: 30px;
