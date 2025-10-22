@@ -240,28 +240,17 @@
                         </button>
                     </div>
                     <div class="form-group">
-                        <label>Choose a Model Preset</label>
-                         <div class="video-model-presets" id="video-model-presets">
-                            <button class="video-model-preset" data-model="veo-standard" data-is-veo="true">
-                                <i class="fas fa-video"></i>
-                                <span>Standard Veo</span>
-                                <p>Balanced quality and speed for general use.</p>
-                            </button>
-                             <button class="video-model-preset" data-model="veo-cinematic" data-is-veo="true">
-                                <i class="fas fa-theater-masks"></i>
-                                <span>Cinematic Veo</span>
-                                <p>High-fidelity, dramatic visuals, and lighting.</p>
-                            </button>
-                             <button class="video-model-preset" data-model="stylus-animated">
-                                <i class="fas fa-pencil-ruler"></i>
-                                <span>Stylus Animated</span>
-                                <p>For anime, cartoon, and illustrative styles.</p>
-                            </button>
-                             <button class="video-model-preset" data-model="frame-interpolation">
-                                <i class="fas fa-fast-forward"></i>
-                                <span>Frame Interpolation</span>
-                                <p>Creates ultra-smooth, high-frame-rate video.</p>
-                            </button>
+                        <label for="video-model-select">Choose a Video Generation Model</label>
+                        <div class="select-wrapper">
+                            <select id="video-model-select">
+                                <option value="veo-standard" data-is-veo="true">Standard Veo (Real)</option>
+                                <option value="veo-cinematic" data-is-veo="true">Cinematic Veo (Real)</option>
+                                <option value="svd" data-is-veo="false">SVD (Simulation)</option>
+                                <option value="cogvideox" data-is-veo="false">CogVideoX (Simulation)</option>
+                                <option value="lumina" data-is-veo="false">Lumina (Simulation)</option>
+                                <option value="stylus-animated" data-is-veo="false">Stylus Animated (Simulation)</option>
+                                <option value="frame-interpolation" data-is-veo="false">Frame Interpolation (Simulation)</option>
+                            </select>
                         </div>
                     </div>
                     <div class="video-preview" id="video-preview-container">

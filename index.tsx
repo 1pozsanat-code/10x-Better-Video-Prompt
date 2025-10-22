@@ -75,7 +75,7 @@ const suggestFirstFrameBtn = document.getElementById('suggest-first-frame-btn') 
 const suggestLastFrameBtn = document.getElementById('suggest-last-frame-btn') as HTMLButtonElement;
 
 // Video Model Preset selectors
-const videoModelPresetsContainer = document.getElementById('video-model-presets');
+const videoModelSelect = document.getElementById('video-model-select') as HTMLSelectElement;
 
 
 // 3. State variables
@@ -606,7 +606,13 @@ function displayEnhancedPrompt(promptData: any) {
         vfxSuggestionsContainer.style.display = 'none'; // Hide if not enough info
     }
 
-    generateVideoBtn.disabled = !isApiKeySelected && (videoModelPresetsContainer.querySelector('.active') as HTMLElement)?.dataset?.isVeo === 'true';
+    const selectedOption = videoModelSelect.options[videoModelSelect.selectedIndex];
+    const isVeo = selectedOption.dataset.isVeo === 'true';
+    if (isVeo) {
+        generateVideoBtn.disabled = !isApiKeySelected;
+    } else {
+        generateVideoBtn.disabled = false; // For simulated models, only depends on prompt being present
+    }
 
     setupInteractiveViewfinder(promptData.scene);
 
@@ -1845,17 +1851,35 @@ async function initApiKeyCheck() {
         if (await window.aistudio.hasSelectedApiKey()) {
             apiKeyGate.style.display = 'none';
             isApiKeySelected = true;
-            if (currentEnhancedPrompt) {
-                generateVideoBtn.disabled = false;
-            }
+            handleModelSelectionChange();
         } else {
-            resetApiKeyGate();
+            handleModelSelectionChange();
         }
     } catch (e) {
         // Fallback for environments where aistudio is not available
         console.warn("aistudio.hasSelectedApiKey() not available. Hiding API key gate.");
         apiKeyGate.style.display = 'none';
         isApiKeySelected = true;
+    }
+}
+
+function handleModelSelectionChange() {
+    const selectedOption = videoModelSelect.options[videoModelSelect.selectedIndex];
+    selectedVideoModelPreset = selectedOption.value;
+    const isVeo = selectedOption.dataset.isVeo === 'true';
+
+    if (isVeo) {
+        // Veo model selected
+        if (!isApiKeySelected) {
+            resetApiKeyGate(); // Shows gate, disables button
+        } else {
+            apiKeyGate.style.display = 'none';
+            generateVideoBtn.disabled = !currentEnhancedPrompt; // Enable if prompt exists
+        }
+    } else {
+        // Simulation model selected
+        apiKeyGate.style.display = 'none';
+        generateVideoBtn.disabled = !currentEnhancedPrompt; // Enable if prompt exists
     }
 }
 
@@ -1988,26 +2012,8 @@ async function init() {
     suggestFirstFrameBtn.onclick = () => generateFramePromptSuggestion('first');
     suggestLastFrameBtn.onclick = () => generateFramePromptSuggestion('last');
 
-    // Video Model Preset listeners
-    videoModelPresetsContainer.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        const button = target.closest('.video-model-preset');
-        if (!button) return;
-
-        const model = (button as HTMLElement).dataset.model;
-        const isVeo = (button as HTMLElement).dataset.isVeo === 'true';
-
-        videoModelPresetsContainer.querySelectorAll('.video-model-preset').forEach(b => b.classList.remove('active'));
-        button.classList.add('active');
-        selectedVideoModelPreset = model;
-        
-        // Disable generate button if a Veo model is selected and no API key is present
-        if(isVeo) {
-            generateVideoBtn.disabled = !isApiKeySelected;
-        } else {
-             generateVideoBtn.disabled = !currentEnhancedPrompt;
-        }
-    });
+    // Video Model Selection listener
+    videoModelSelect.onchange = handleModelSelectionChange;
     
     // API Key listener
     selectApiKeyBtn.onclick = async () => {
@@ -2016,9 +2022,7 @@ async function init() {
             // Assume success to avoid race condition
             apiKeyGate.style.display = 'none';
             isApiKeySelected = true;
-            if (currentEnhancedPrompt) {
-                generateVideoBtn.disabled = false;
-            }
+            handleModelSelectionChange();
         } catch(e) {
             console.error("Error opening API key selection:", e);
             showNotification("Could not open API key selection dialog.");
@@ -2035,8 +2039,9 @@ async function init() {
             return;
         }
 
-        const activePreset = videoModelPresetsContainer.querySelector('.active') as HTMLElement;
-        const isVeo = activePreset?.dataset.isVeo === 'true';
+        const selectedOption = videoModelSelect.options[videoModelSelect.selectedIndex];
+        const isVeo = selectedOption.dataset.isVeo === 'true';
+        const modelDisplayName = selectedOption.text;
 
         if (isVeo) {
             // Real Veo Generation
@@ -2048,7 +2053,7 @@ async function init() {
             const prompt = simplifiedPromptEl.textContent;
 
             const loadingMessages = [
-                `Request sent to '${selectedVideoModelPreset}'...`,
+                `Request sent to '${modelDisplayName}'...`,
                 "This can take a few minutes. Please wait.",
                 "Still rendering your masterpiece...",
                 "Applying cinematic touches...",
@@ -2120,8 +2125,8 @@ async function init() {
 
         } else {
             // Simulation
-            videoPreviewContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i><p>Simulating generation with '${selectedVideoModelPreset}' model...</p></div>`;
-            showNotification(`Simulating video generation with ${selectedVideoModelPreset}...`);
+            videoPreviewContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i><p>Simulating generation with '${modelDisplayName}'...</p></div>`;
+            showNotification(`Simulating video generation with ${modelDisplayName}...`);
 
             setTimeout(() => {
                  videoPreviewContainer.innerHTML = `<div class="placeholder" style="padding: 0; height: 100%;"><p style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;">Simulation complete!</p><video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;"><source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"></video></div>`;
@@ -2144,11 +2149,8 @@ async function init() {
         btn.onclick = () => addSoundEffect(preset);
         sfxPresetsContainer.appendChild(btn);
     });
-    // Set default active video model
-    const defaultModelBtn = videoModelPresetsContainer.querySelector('[data-model="veo-standard"]');
-    if (defaultModelBtn) {
-        defaultModelBtn.classList.add('active');
-    }
+    
+    handleModelSelectionChange();
 }
 
 document.addEventListener('DOMContentLoaded', init);
