@@ -185,15 +185,15 @@ const videoPromptSchema = {
                 type: { type: Type.STRING, description: 'Primary type of lighting (e.g., "Natural sunlight", "Studio lighting", "Neon glow").' },
                 quality: { 
                     type: Type.STRING, 
-                    description: 'Quality of the light. Be specific, using terms like "Hard shadows with high contrast", "Soft diffused light creating a gentle glow", "Dappled light through foliage", or "Sharp specular highlights on wet surfaces".' 
+                    description: 'Quality of the light, describing its hardness and diffusion. Be specific, using terms like "Hard, crisp shadows with high contrast (chiaroscuro)", "Soft, diffused light creating a gentle, wrapping glow", "Dappled light filtering through foliage or blinds", "Sharp specular highlights on wet or metallic surfaces", or "Flat, even lighting with minimal shadows".' 
                 },
                 color_temperature: { 
                     type: Type.STRING, 
-                    description: 'Color tones of the light. Be evocative with examples like "Warm golden hour sunlight", "Cool, sterile blue tones of a medical lab", "Vibrant neon pink and cyan glow", or "Fiery orange of a sunset".' 
+                    description: 'Color tones of the light. Be evocative with examples like "Warm golden hour sunlight", "Cool, sterile blue tones of a medical lab", "Vibrant neon pink and cyan glow of a futuristic city", "Fiery orange of a sunset", "Sickly green of fluorescent bulbs", or "Muted, monochromatic tones of a noir film".' 
                 },
                 key_light_source: { 
                     type: Type.STRING, 
-                    description: 'The direction, intensity, and nature of the main light source. Specify both direction and intensity (e.g., "Bright, top-down moonlight", "Soft side-light from a large window", "Harsh, direct overhead spotlight", "Faint, flickering light from a distant fire").' 
+                    description: 'The direction and intensity of the primary light source. Be extremely specific. For direction, use terms like "front-lit", "side-lit from the left", "top-down", "backlit", or "underlit". For intensity and quality, describe it vividly, e.g., "Intense, blinding overhead sun", "Soft, gentle light filtering through a window to the right", "Flickering, dim candlelight from below", "Harsh, direct spotlight from the front".' 
                 },
                 fill_light_intensity: { type: Type.STRING, description: 'The intensity of the fill light, which softens shadows (e.g., "Low", "Medium", "None").' },
                 backlight_effect: { type: Type.STRING, description: 'The effect of the backlight, which separates the subject from the background (e.g., "Rim lighting for a halo effect", "Silhouette", "None").' },
