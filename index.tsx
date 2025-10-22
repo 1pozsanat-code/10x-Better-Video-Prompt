@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Chat, Type, Modality } from "@google/genai";
 
 // 1. Initialize the Gemini AI Model
@@ -54,6 +52,11 @@ const sfxCustomInput = document.getElementById('sfx-custom-input') as HTMLInputE
 const sfxAddBtn = document.getElementById('sfx-add-btn') as HTMLButtonElement;
 const sfxListContainer = document.getElementById('sfx-list-container');
 
+// VFX Elements selectors
+const vfxCustomInput = document.getElementById('vfx-custom-input') as HTMLInputElement;
+const vfxAddBtn = document.getElementById('vfx-add-btn') as HTMLButtonElement;
+const vfxListContainer = document.getElementById('vfx-list-container');
+
 // Frame Generation selectors
 const generateFirstFrameBtn = document.getElementById('generate-first-frame-btn') as HTMLButtonElement;
 const generateLastFrameBtn = document.getElementById('generate-last-frame-btn') as HTMLButtonElement;
@@ -63,6 +66,11 @@ const firstFramePreviewContainer = document.getElementById('first-frame-preview-
 const lastFramePreviewContainer = document.getElementById('last-frame-preview-container');
 const useSubjectFirstBtn = document.getElementById('use-subject-first') as HTMLButtonElement;
 const useSubjectLastBtn = document.getElementById('use-subject-last') as HTMLButtonElement;
+const suggestFirstFrameBtn = document.getElementById('suggest-first-frame-btn') as HTMLButtonElement;
+const suggestLastFrameBtn = document.getElementById('suggest-last-frame-btn') as HTMLButtonElement;
+
+// Video Model Preset selectors
+const videoModelPresetsContainer = document.getElementById('video-model-presets');
 
 
 // 3. State variables
@@ -76,6 +84,7 @@ const SAVED_PROMPTS_KEY = 'ai-video-prompts';
 let firstFrameBase64: string | null = null;
 let lastFrameBase64: string | null = null;
 let searchSuggestionTimeout: number | null = null;
+let selectedVideoModelPreset: string | null = 'veo-standard';
 
 // Viewfinder state
 let currentSceneData: any | null = null;
@@ -592,9 +601,11 @@ function displayEnhancedPrompt(promptData: any) {
     generateVideoBtn.disabled = false;
     setupInteractiveViewfinder(promptData.scene);
 
-    // Enable 'Use Subject' buttons for frame generation
+    // Enable 'Use Subject' and 'Suggest' buttons for frame generation
     useSubjectFirstBtn.disabled = !promptData.scene?.subject;
     useSubjectLastBtn.disabled = !promptData.scene?.subject;
+    suggestFirstFrameBtn.disabled = false;
+    suggestLastFrameBtn.disabled = false;
 
 
     // --- Trigger catalyst generation ---
@@ -608,6 +619,9 @@ function displayEnhancedPrompt(promptData: any) {
         catalystsContainer.classList.remove('placeholder');
         generateSceneCatalysts(promptData.scene);
     }
+    
+    // --- Populate manual VFX list ---
+    updateVFXList();
 }
 
 /** Generates a color from a string for the color chips */
@@ -999,6 +1013,7 @@ function applyTiltSuggestion(suggestion: { effect: string, description: string }
     const newVfx = [...currentVfx, suggestionText];
     
     updatePromptAndRefreshJSON('vfx_elements', newVfx);
+    updateVFXList(); // Keep the manual editor in sync
     
     showNotification(`Applied: ${suggestion.effect}`);
 }
@@ -1020,6 +1035,7 @@ function applyVFXSuggestion(suggestion: string, buttonElement: HTMLButtonElement
     const newVfx = [...currentVfx, suggestion];
     
     updatePromptAndRefreshJSON('vfx_elements', newVfx);
+    updateVFXList(); // Keep the manual editor in sync
     
     showNotification(`Applied: ${suggestion}`);
     buttonElement.disabled = true;
@@ -1283,6 +1299,49 @@ function removeSoundEffect(index: number) {
     updateSFXList();
 }
 
+/** Updates the list of displayed VFX elements */
+function updateVFXList() {
+    vfxListContainer.innerHTML = '';
+    if (!currentEnhancedPrompt || !currentEnhancedPrompt.vfx_elements) {
+        return;
+    }
+    currentEnhancedPrompt.vfx_elements.forEach((vfx: string, index: number) => {
+        const item = document.createElement('div');
+        item.className = 'vfx-item';
+        item.innerHTML = `
+            <span>${vfx}</span>
+            <button class="vfx-remove-btn" data-index="${index}" title="Remove">&times;</button>
+        `;
+        vfxListContainer.appendChild(item);
+    });
+}
+
+/** Adds a VFX element to the list and the main prompt */
+function addVFX() {
+    if (!currentEnhancedPrompt) {
+        showNotification("Please generate an enhanced prompt first.");
+        return;
+    }
+    const vfx = vfxCustomInput.value.trim();
+    if (vfx && !currentEnhancedPrompt.vfx_elements.includes(vfx)) {
+        const newVfx = [...currentEnhancedPrompt.vfx_elements, vfx];
+        updatePromptAndRefreshJSON('vfx_elements', newVfx);
+        updateVFXList();
+        vfxCustomInput.value = '';
+    }
+}
+
+/** Removes a VFX element from the list and the main prompt */
+function removeVFX(index: number) {
+    if (!currentEnhancedPrompt || !currentEnhancedPrompt.vfx_elements) return;
+    
+    const newVfx = [...currentEnhancedPrompt.vfx_elements];
+    newVfx.splice(index, 1);
+    updatePromptAndRefreshJSON('vfx_elements', newVfx);
+    updateVFXList();
+}
+
+
 /** Retrieves saved prompts from local storage */
 function getSavedPrompts(): any[] {
     const promptsJSON = localStorage.getItem(SAVED_PROMPTS_KEY);
@@ -1426,6 +1485,8 @@ async function generateImageFrame(type: 'first' | 'last') {
     }
 
     generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
     previewContainer.innerHTML = `<div class="placeholder-text"><i class="fas fa-spinner fa-spin"></i><p>Generating...</p></div>`;
 
     try {
@@ -1452,8 +1513,49 @@ async function generateImageFrame(type: 'first' | 'last') {
         previewContainer.innerHTML = `<div class="placeholder-text error" style="color: #ff8a80;"><i class="fas fa-exclamation-triangle"></i> Failed to generate</div>`;
     } finally {
         generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate';
     }
 }
+
+/** Generates an AI-powered prompt suggestion for the first or last frame */
+async function generateFramePromptSuggestion(type: 'first' | 'last') {
+    if (!currentEnhancedPrompt) {
+        showNotification("Please generate an enhanced prompt first.");
+        return;
+    }
+
+    const suggestBtn = type === 'first' ? suggestFirstFrameBtn : suggestLastFrameBtn;
+    const promptEl = type === 'first' ? firstFramePrompt : lastFramePrompt;
+
+    suggestBtn.disabled = true;
+    suggestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    const originalPlaceholder = promptEl.placeholder;
+    promptEl.placeholder = 'Generating suggestion...';
+
+    try {
+        const generationPrompt = `Based on the following detailed JSON video prompt, generate a single, concise, and visually descriptive text prompt for the ${type} frame of the scene. The prompt should be suitable for an AI image generator and capture the essence of the ${type === 'first' ? 'opening' : 'closing'} moment described in the shot_sequence. The output must be plain text only, without any explanations, titles, or markdown.
+
+JSON Prompt:
+${JSON.stringify(currentEnhancedPrompt, null, 2)}`;
+
+        const response = await ai.models.generateContent({
+            model: chatModel,
+            contents: generationPrompt,
+        });
+
+        promptEl.value = response.text.trim();
+        showNotification(`Suggested prompt for ${type} frame generated.`);
+
+    } catch (error) {
+        console.error(`Error generating ${type} frame suggestion:`, error);
+        showNotification(`Failed to generate suggestion for ${type} frame.`);
+    } finally {
+        suggestBtn.disabled = false;
+        suggestBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest';
+        promptEl.placeholder = originalPlaceholder;
+    }
+}
+
 
 /** Clears and hides the search suggestions container */
 function clearSearchSuggestions() {
@@ -1509,8 +1611,6 @@ function displaySearchSuggestions(suggestions: string[], sources: any[]) {
         }
     }
     
-    // FIX: The result of querySelector is of type 'Element', which lacks an 'onclick' property.
-    // We check if the element is an HTMLElement to safely assign the event handler.
     const closeBtn = searchSuggestionsContainer.querySelector('#close-suggestions-btn');
     if (closeBtn instanceof HTMLElement) {
         closeBtn.onclick = clearSearchSuggestions;
@@ -1597,9 +1697,12 @@ async function main() {
         catalystsContainer.classList.remove('placeholder');
     }
     
-    // Reset viewfinder
+    // Reset viewfinder and frame generation buttons
     if(viewfinderDisplay) viewfinderDisplay.innerHTML = '<div class="placeholder">Waiting for prompt...</div>';
     if(viewfinderControls) viewfinderControls.style.display = 'none';
+    suggestFirstFrameBtn.disabled = true;
+    suggestLastFrameBtn.disabled = true;
+
 
     try {
         let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt.
@@ -1637,7 +1740,7 @@ User's Idea: "${textPrompt}"`;
         resultsContainer.innerHTML = '<div class="placeholder" style="color: #ff8a80;">An error occurred. Please try again.</div>';
     } finally {
         generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-magic"></i> Enhance Prompt (10X)';
+        generateBtn.innerHTML = '<i class="fas fa-magic"></i> Enhance Prompt';
     }
 }
 
@@ -1788,14 +1891,32 @@ function init() {
     });
     sfxListContainer.addEventListener('click', (e) => {
         const target = e.target;
-        // FIX: The original code had a TypeScript error because `e.target` is of type `EventTarget`.
-        // By checking if it's an `HTMLElement`, we can safely access `dataset`.
         if (target instanceof HTMLElement && target.classList.contains('sfx-remove-btn')) {
             const indexStr = target.dataset.index;
             if (indexStr !== undefined) {
                 const index = parseInt(indexStr, 10);
                 if (!isNaN(index)) {
                     removeSoundEffect(index);
+                }
+            }
+        }
+    });
+    
+    // VFX Listeners
+    vfxAddBtn.onclick = addVFX;
+    vfxCustomInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            addVFX();
+        }
+    });
+    vfxListContainer.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target instanceof HTMLElement && target.classList.contains('vfx-remove-btn')) {
+            const indexStr = target.dataset.index;
+            if (indexStr !== undefined) {
+                const index = parseInt(indexStr, 10);
+                if (!isNaN(index)) {
+                    removeVFX(index);
                 }
             }
         }
@@ -1830,6 +1951,42 @@ function init() {
             lastFramePrompt.value = currentEnhancedPrompt.scene.subject;
         }
     };
+    suggestFirstFrameBtn.onclick = () => generateFramePromptSuggestion('first');
+    suggestLastFrameBtn.onclick = () => generateFramePromptSuggestion('last');
+
+    // Video Model Preset listeners
+    videoModelPresetsContainer.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const button = target.closest('.video-model-preset');
+        if (!button) return;
+
+        const model = (button as HTMLElement).dataset.model;
+
+        videoModelPresetsContainer.querySelectorAll('.video-model-preset').forEach(b => b.classList.remove('active'));
+        button.classList.add('active');
+        selectedVideoModelPreset = model;
+    });
+
+    generateVideoBtn.onclick = () => {
+        if (!currentEnhancedPrompt) {
+            showNotification("Error: Please enhance a prompt first.");
+            return;
+        }
+        if (!selectedVideoModelPreset) {
+            showNotification("Please select a video model preset.");
+            return;
+        }
+
+        const preview = document.querySelector('.video-preview');
+        preview.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i><p>Generating with '${selectedVideoModelPreset}' model...</p></div>`;
+        
+        showNotification(`Simulating video generation with ${selectedVideoModelPreset}...`);
+
+        setTimeout(() => {
+             preview.innerHTML = `<div class="placeholder" style="padding: 0; height: 100%;"><p style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;">Simulation complete!</p><video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;"><source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"></video></div>`;
+        }, 3000);
+    };
+
 
     // Initial setup
     renderSavedPrompts();
@@ -1843,6 +2000,11 @@ function init() {
         btn.onclick = () => addSoundEffect(preset);
         sfxPresetsContainer.appendChild(btn);
     });
+    // Set default active video model
+    const defaultModelBtn = videoModelPresetsContainer.querySelector('[data-model="veo-standard"]');
+    if (defaultModelBtn) {
+        defaultModelBtn.classList.add('active');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', init);
