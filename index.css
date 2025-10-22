@@ -1533,3 +1533,61 @@ select:focus {
     color: #ff8a80;
     font-weight: 600;
 }
+
+/* --- Narrative Arc Styles --- */
+.narrative-arc-container {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.narrative-arc-container > strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+    font-weight: 500;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.narrative-arc-logline {
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 15px;
+    padding-left: 20px;
+    position: relative;
+}
+.narrative-arc-logline::before {
+    content: '"';
+    position: absolute;
+    left: 5px;
+    top: -5px;
+    font-size: 1.5rem;
+    opacity: 0.5;
+}
+
+.narrative-beats-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.narrative-beat-item {
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.narrative-beat-title {
+    font-weight: bold;
+    color: #8ee7a2;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.narrative-beat-description {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}

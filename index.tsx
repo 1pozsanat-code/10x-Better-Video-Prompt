@@ -7,6 +7,7 @@ const chatModel = 'gemini-2.5-flash'; // Using a faster model for chat, summariz
 
 // 2. DOM element selectors
 const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
+const narrativeArcToggle = document.getElementById('narrative-arc-toggle') as HTMLInputElement;
 const negativePromptInput = document.getElementById('negative-prompt') as HTMLTextAreaElement;
 const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
 const resultsContainer = document.getElementById('results-container');
@@ -225,6 +226,27 @@ const videoPromptSchema = {
         }
     },
     required: ['meta', 'scene', 'cinematography', 'lighting', 'technical', 'tags'],
+};
+
+const narrativeArcSchema = {
+    type: Type.OBJECT,
+    properties: {
+        title: { type: Type.STRING, description: "A concise, cinematic title for the story." },
+        logline: { type: Type.STRING, description: "A one-sentence summary of the story." },
+        beats: {
+            type: Type.OBJECT,
+            description: "The key story beats that form the narrative arc.",
+            properties: {
+                exposition: { type: Type.STRING, description: "Introduction of the setting and main character." },
+                inciting_incident: { type: Type.STRING, description: "The event that kicks off the main conflict." },
+                rising_action: { type: Type.STRING, description: "A brief summary of the escalating conflict and stakes." },
+                climax: { type: Type.STRING, description: "The peak of the conflict, the main confrontation." },
+                resolution: { type: Type.STRING, description: "The immediate aftermath and conclusion of the story." }
+            },
+            required: ["exposition", "inciting_incident", "rising_action", "climax", "resolution"]
+        }
+    },
+    required: ["title", "logline", "beats"]
 };
 
 const imageAnalysisSchema = {
@@ -480,7 +502,7 @@ function updatePromptAndRefreshJSON(path: string, value: any) {
 
 
 /** Displays the enhanced prompt in the results container */
-function displayEnhancedPrompt(promptData: any) {
+function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = null) {
     resultsContainer.innerHTML = '';
     currentEnhancedPrompt = promptData;
 
@@ -517,6 +539,41 @@ function displayEnhancedPrompt(promptData: any) {
     simpleTextContent.id = 'simple-text-content-container'; // Add ID for easier selection
     simpleTextContent.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating simplified text...`;
     
+    // --- Narrative Arc Section ---
+    const narrativeArcContainer = document.createElement('div');
+    if (narrativeArcData) {
+        narrativeArcContainer.className = 'narrative-arc-container';
+        
+        const header = document.createElement('strong');
+        header.innerHTML = `<i class="fas fa-scroll"></i> Narrative Arc: ${narrativeArcData.title}`;
+        narrativeArcContainer.appendChild(header);
+
+        const logline = document.createElement('p');
+        logline.className = 'narrative-arc-logline';
+        logline.textContent = narrativeArcData.logline;
+        narrativeArcContainer.appendChild(logline);
+
+        const beatsList = document.createElement('div');
+        beatsList.className = 'narrative-beats-list';
+        
+        const beats: { [key: string]: string } = narrativeArcData.beats;
+        const beatOrder = ['exposition', 'inciting_incident', 'rising_action', 'climax', 'resolution'];
+
+        beatOrder.forEach(key => {
+            if(beats[key]) {
+                const item = document.createElement('div');
+                item.className = 'narrative-beat-item';
+                const title = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                item.innerHTML = `
+                    <div class="narrative-beat-title">${title}</div>
+                    <p class="narrative-beat-description">${beats[key]}</p>
+                `;
+                beatsList.appendChild(item);
+            }
+        });
+        narrativeArcContainer.appendChild(beatsList);
+    }
+
     // --- Exclusions Section ---
     const exclusionsContainer = document.createElement('div');
     exclusionsContainer.className = 'exclusions-container';
@@ -654,6 +711,9 @@ function displayEnhancedPrompt(promptData: any) {
     promptCard.appendChild(jsonContent);
     promptCard.appendChild(simpleTextHeader);
     promptCard.appendChild(simpleTextContent);
+    if (narrativeArcData) {
+        promptCard.appendChild(narrativeArcContainer);
+    }
     if (exclusionsContainer.hasChildNodes()) {
         promptCard.appendChild(exclusionsContainer);
     }
@@ -1795,6 +1855,7 @@ function resetAllInputs() {
     promptInput.value = '';
     negativePromptInput.value = '';
     clearSearchSuggestions();
+    narrativeArcToggle.checked = false;
 
     // NSFW toggle
     nsfwToggle.checked = false;
@@ -1896,11 +1957,50 @@ async function main() {
     suggestFirstFrameBtn.disabled = true;
     suggestLastFrameBtn.disabled = true;
 
+    let narrativeArcData = null;
 
     try {
+        // Step 1: Generate Narrative Arc if toggled
+        if (narrativeArcToggle.checked) {
+            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Building narrative...';
+            const narrativePrompt = `Based on the user's idea "${textPrompt}", generate a compelling 5-beat narrative arc (Exposition, Inciting Incident, Rising Action, Climax, Resolution). The output must be a valid JSON object.`;
+            
+            try {
+                const narrativeResponse = await ai.models.generateContent({
+                    model: chatModel, // Use a faster model for the story part
+                    contents: narrativePrompt,
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: narrativeArcSchema,
+                    }
+                });
+                narrativeArcData = JSON.parse(narrativeResponse.text);
+            } catch (narrativeError) {
+                console.warn("Could not generate narrative arc, proceeding without it.", narrativeError);
+                showNotification("Warning: Could not generate a narrative arc. Proceeding with standard enhancement.");
+            }
+        }
+
+
+        // Step 2: Generate the main video prompt
+        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing details...';
         let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt.
 
 User's Idea: "${textPrompt}"`;
+
+        if (narrativeArcData) {
+            generationPrompt += `\n\n**Crucially, use the following narrative arc to structure the scene and define the 'purpose' for each shot in the 'cinematography.shot_sequence'.** Each shot's purpose must directly correspond to and elaborate upon one of the provided story beats. Ensure the shot sequence follows the narrative flow logically from exposition to resolution.
+\nNarrative Arc:
+Title: ${narrativeArcData.title}
+Logline: ${narrativeArcData.logline}
+Beats: 
+- Exposition: ${narrativeArcData.beats.exposition}
+- Inciting Incident: ${narrativeArcData.beats.inciting_incident}
+- Rising Action: ${narrativeArcData.beats.rising_action}
+- Climax: ${narrativeArcData.beats.climax}
+- Resolution: ${narrativeArcData.beats.resolution}
+`;
+        }
 
         if (negativePromptInput.value.trim()) {
             generationPrompt += `\n\nNegative Prompt/Exclusions: "${negativePromptInput.value.trim()}"`;
@@ -1930,7 +2030,7 @@ User's Idea: "${textPrompt}"`;
         });
         
         const enhancedPrompt = JSON.parse(response.text);
-        displayEnhancedPrompt(enhancedPrompt);
+        displayEnhancedPrompt(enhancedPrompt, narrativeArcData);
 
     } catch (error) {
         console.error('Error generating prompt:', error);

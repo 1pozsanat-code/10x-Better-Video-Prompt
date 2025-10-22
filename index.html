@@ -38,6 +38,18 @@
                     <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night..."></textarea>
                     <div id="search-suggestions-container" class="search-suggestions-container" style="display: none;"></div>
                 </div>
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label for="narrative-arc-toggle">Suggest Narrative Arc</label>
+                        <label class="toggle-switch-container">
+                            <input type="checkbox" id="narrative-arc-toggle" class="toggle-switch">
+                            <span class="slider-label"></span>
+                        </label>
+                    </div>
+                    <p class="disclaimer-text" style="display: block; margin-top: 5px; color: rgba(255, 255, 255, 0.6);">
+                        When enabled, the AI will generate a short story structure to create a more coherent shot sequence.
+                    </p>
+                </div>
                 <div class="form-group nsfw-toggle-group">
                     <label for="nsfw-toggle" class="nsfw-toggle-text-label">Enable NSFW Content</label>
                     <label class="toggle-switch-container">
