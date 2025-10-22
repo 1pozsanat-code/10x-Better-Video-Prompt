@@ -411,9 +411,9 @@ function showNotification(message: string = 'Copied to clipboard!') {
 }
 
 /** Copies text to the clipboard */
-function copyToClipboard(text: string) {
+function copyToClipboard(text: string, message: string = 'Copied to clipboard!') {
   navigator.clipboard.writeText(text).then(() => {
-    showNotification('Prompt copied to clipboard!');
+    showNotification(message);
   }).catch(err => {
     console.error('Failed to copy text: ', err);
     alert('Failed to copy');
@@ -729,14 +729,16 @@ function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = n
     resultsContainer.appendChild(promptCard);
     
     // --- Add event listeners ---
-    (promptCard.querySelector('#copy-json-btn') as HTMLButtonElement).onclick = () => copyToClipboard(JSON.stringify(promptData, null, 2));
+    (promptCard.querySelector('#copy-json-btn') as HTMLButtonElement).onclick = () => copyToClipboard(JSON.stringify(promptData, null, 2), 'JSON prompt copied to clipboard!');
 
     (promptCard.querySelector('#save-prompt-btn') as HTMLButtonElement).onclick = () => {
         const prompts = getSavedPrompts();
+        const simpleText = document.getElementById('simple-text-content-container')?.textContent || '';
         const newPrompt = {
             id: Date.now(),
             title: `${promptData.scene?.subject || 'Untitled'} - ${promptData.meta?.style || 'Default Style'}`,
-            data: promptData
+            data: promptData,
+            simpleText: simpleText
         };
         prompts.unshift(newPrompt); // Add to the beginning of the list
         savePrompts(prompts);
@@ -939,7 +941,7 @@ ${JSON.stringify(promptData, null, 2)}`;
         contentElement.classList.remove('placeholder');
         
         buttonElement.disabled = false;
-        buttonElement.onclick = () => copyToClipboard(simpleText);
+        buttonElement.onclick = () => copyToClipboard(simpleText, 'Simplified text prompt copied!');
 
     } catch (error) {
         console.error('Error generating simple prompt:', error);
@@ -1539,6 +1541,7 @@ function renderSavedPrompts() {
             </div>
             <div class="saved-prompt-actions">
                 <button class="action-btn" data-id="${prompt.id}" name="load"><i class="fas fa-folder-open"></i> Load</button>
+                ${prompt.simpleText ? `<button class="action-btn" data-id="${prompt.id}" name="copy-text"><i class="fas fa-file-alt"></i> Copy Text</button>` : ''}
                 <button class="action-btn" data-id="${prompt.id}" name="delete"><i class="fas fa-trash-alt"></i> Delete</button>
             </div>
         `;
@@ -2389,6 +2392,12 @@ async function init() {
             const id = parseInt(button.dataset.id, 10);
             if (button.name === 'load') {
                 loadPrompt(id);
+            } else if (button.name === 'copy-text') {
+                const prompts = getSavedPrompts();
+                const promptToCopy = prompts.find(p => p.id === id);
+                if (promptToCopy && promptToCopy.simpleText) {
+                    copyToClipboard(promptToCopy.simpleText, 'Simplified text prompt copied!');
+                }
             } else if (button.name === 'delete') {
                 if (confirm('Are you sure you want to delete this prompt?')) {
                     deletePrompt(id);
