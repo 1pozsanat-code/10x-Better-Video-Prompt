@@ -92,7 +92,6 @@ let chat: Chat;
 let currentEnhancedPrompt: any | null = null;
 let uploadedImageBase64: { mimeType: string, data: string } | null = null;
 let selectedStylePreset: string | null = null;
-let styleDescriptionsCache: any | null = null;
 let addedSoundEffects: string[] = [];
 const SAVED_PROMPTS_KEY = 'ai-video-prompts';
 const PROMPT_HISTORY_KEY = 'ai-video-prompt-history';
@@ -360,45 +359,6 @@ const vfxSuggestionsSchema = {
         }
     },
     required: ["vfx_suggestions"]
-};
-
-const styleVisualsSchema = {
-    type: Type.OBJECT,
-    properties: {
-        cinematic: {
-            type: Type.OBJECT,
-            properties: {
-                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
-                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks (e.g., 'Dramatic lighting, film grain, shallow depth of field')." }
-            },
-            required: ["description", "key_elements"]
-        },
-        anime: {
-            type: Type.OBJECT,
-            properties: {
-                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
-                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks." }
-            },
-            required: ["description", "key_elements"]
-        },
-        photorealistic: {
-            type: Type.OBJECT,
-            properties: {
-                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
-                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks." }
-            },
-            required: ["description", "key_elements"]
-        },
-        abstract: {
-            type: Type.OBJECT,
-            properties: {
-                description: { type: Type.STRING, description: "A one-sentence summary of the style's feeling." },
-                key_elements: { type: Type.STRING, description: "A comma-separated list of 3-4 key visual trademarks." }
-            },
-            required: ["description", "key_elements"]
-        }
-    },
-    required: ["cinematic", "anime", "photorealistic", "abstract"]
 };
 
 
@@ -1308,9 +1268,28 @@ async function generateVFXSuggestions(mood: string, setting: string, container: 
     }
 }
 
+// Hardcoded descriptions for style presets to avoid rate-limiting errors.
+const styleVisualsData = {
+    cinematic: {
+        description: "Dramatic lighting, film grain, and a focus on epic storytelling.",
+        key_elements: "Shallow depth of field, anamorphic lens flares, high contrast, deliberate color grading"
+    },
+    anime: {
+        description: "Vibrant colors, expressive characters, and dynamic action sequences.",
+        key_elements: "Cel-shading, bold outlines, exaggerated physics, speed lines"
+    },
+    photorealistic: {
+        description: "Hyper-realistic textures and lighting that mimics the real world.",
+        key_elements: "Accurate reflections, ray-traced shadows, detailed textures, natural physics"
+    },
+    abstract: {
+        description: "A non-representational focus on shapes, colors, and movement.",
+        key_elements: "Geometric patterns, fluid dynamics, particle systems, surreal compositions"
+    }
+};
 
-/** Generates and displays example prompts for each style preset */
-async function generateAndDisplayExamplePrompts() {
+/** Displays the hardcoded example prompts for each style preset */
+function displayStylePresetVisuals() {
     const visualContainers: { [key: string]: HTMLElement | null } = {
         cinematic: document.getElementById('style-visual-cinematic'),
         anime: document.getElementById('style-visual-anime'),
@@ -1318,48 +1297,20 @@ async function generateAndDisplayExamplePrompts() {
         abstract: document.getElementById('style-visual-abstract'),
     };
 
-    // Add placeholders
-    Object.values(visualContainers).forEach(container => {
-        if (container) {
-            container.innerHTML = `<div class="placeholder-text"><i class="fas fa-spinner fa-spin"></i></div>`;
+    const descriptions = styleVisualsData; // Use the hardcoded data
+
+    Object.keys(descriptions).forEach(style => {
+        const container = visualContainers[style as keyof typeof visualContainers];
+        const data = descriptions[style as keyof typeof descriptions];
+        if (container && data) {
+            container.innerHTML = `
+                <div class="style-visual-description">${data.description}</div>
+                <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${data.key_elements}</div>
+            `;
         }
     });
-
-    try {
-        const prompt = `For each of the following video styles (cinematic, anime, photorealistic, abstract), provide a detailed JSON object. Each object must contain a 'description' (a short, evocative, one-sentence summary of the style's feeling) and 'key_elements' (a comma-separated string of 3-4 defining visual characteristics, like lighting, texture, or composition styles).`;
-
-        const response = await ai.models.generateContent({
-            model: chatModel,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: styleVisualsSchema,
-            },
-        });
-
-        const descriptions = JSON.parse(response.text);
-        styleDescriptionsCache = descriptions; // Cache the results
-
-        Object.keys(descriptions).forEach(style => {
-            const container = visualContainers[style as keyof typeof visualContainers];
-            const data = descriptions[style as keyof typeof descriptions];
-            if (container && data) {
-                container.innerHTML = `
-                    <div class="style-visual-description">${data.description}</div>
-                    <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${data.key_elements}</div>
-                `;
-            }
-        });
-
-    } catch (error) {
-        console.error("Error generating style visuals:", error);
-        Object.values(visualContainers).forEach(container => {
-            if (container) {
-                container.innerHTML = `<div class="placeholder-text error" style="font-size: 0.8em; color: #ff8a80;"><i class="fas fa-exclamation-triangle"></i> Failed to load</div>`;
-            }
-        });
-    }
 }
+
 
 /** Generates dynamic scene catalysts based on the current prompt */
 async function generateSceneCatalysts(scene: any) {
@@ -2611,7 +2562,7 @@ async function init() {
     // Initial setup
     renderSavedPrompts();
     renderPromptHistory();
-    generateAndDisplayExamplePrompts();
+    displayStylePresetVisuals();
     initApiKeyCheck();
 
     // Populate SFX presets
