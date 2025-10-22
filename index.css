@@ -414,6 +414,94 @@ button:disabled {
     color: rgba(255, 255, 255, 0.9);
 }
 
+/* --- Cinematography Styles --- */
+.cinematography-container {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cinematography-container > strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+    font-weight: 500;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.shot-sequence-timeline {
+    position: relative;
+    padding-left: 25px;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.shot-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.shot-item:last-child {
+    margin-bottom: 0;
+}
+
+.shot-number {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #ff7e5f;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid rgba(0,0,0,0.3);
+}
+
+.shot-details {
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.shot-type {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #feb47b;
+}
+
+.shot-purpose {
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 5px 0 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.shot-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.cinematography-other-details {
+    margin-top: 15px;
+    font-size: 0.9rem;
+}
+
+.cinematography-other-details div {
+    margin-bottom: 8px;
+}
+
+.cinematography-other-details strong {
+    color: rgba(255, 255, 255, 0.7);
+    margin-right: 8px;
+}
+
+
 .chatbot {
     background: rgba(255, 255, 255, 0.08);
     border-radius: 15px;

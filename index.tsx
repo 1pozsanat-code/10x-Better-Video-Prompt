@@ -140,7 +140,7 @@ const videoPromptSchema = {
             properties: {
                 shot_sequence: {
                     type: Type.ARRAY,
-                    description: 'A sequence of 3-5 key shots describing the scene. For each shot, specify the type and a brief description.',
+                    description: 'A sequence of 3-5 distinct key shots that define the visual flow and narrative of the scene. Each shot should build upon the last.',
                     items: {
                         type: Type.OBJECT,
                         properties: {
@@ -150,10 +150,14 @@ const videoPromptSchema = {
                             },
                             description: {
                                 type: Type.STRING,
-                                description: 'A brief description of the action or composition within this shot.'
+                                description: 'A brief but vivid description of the action, subject, and composition within this shot.'
+                            },
+                            purpose: {
+                                type: Type.STRING,
+                                description: 'The narrative purpose of this shot (e.g., "Introduce the character", "Build tension", "Reveal the obstacle", "Climax of the action").'
                             }
                         },
-                        required: ['shot_type', 'description']
+                        required: ['shot_type', 'description', 'purpose']
                     }
                 },
                 camera_movement: { type: Type.STRING, description: 'Description of camera movements. Use specific cinematic terms like "dolly zoom", "crane shot", "whip pan", "dutch angle", "steadicam", "handheld shaky cam".' },
@@ -553,6 +557,53 @@ function displayEnhancedPrompt(promptData: any) {
         lightingContainer.appendChild(lightingGrid);
     }
 
+    // --- Cinematography Section ---
+    const cinematographyContainer = document.createElement('div');
+    cinematographyContainer.className = 'cinematography-container';
+    if (promptData.cinematography?.shot_sequence?.length > 0) {
+        const header = document.createElement('strong');
+        header.innerHTML = '<i class="fas fa-video"></i> Cinematography & Shot Flow';
+        cinematographyContainer.appendChild(header);
+
+        const timeline = document.createElement('div');
+        timeline.className = 'shot-sequence-timeline';
+
+        promptData.cinematography.shot_sequence.forEach((shot: any, index: number) => {
+            const item = document.createElement('div');
+            item.className = 'shot-item';
+            item.innerHTML = `
+                <div class="shot-number">${index + 1}</div>
+                <div class="shot-details">
+                    <div class="shot-type">${shot.shot_type}</div>
+                    <div class="shot-purpose">${shot.purpose}</div>
+                    <p class="shot-description">${shot.description}</p>
+                </div>
+            `;
+            timeline.appendChild(item);
+        });
+
+        cinematographyContainer.appendChild(timeline);
+        
+        // Also display camera movement and framing if available
+        const otherDetails = document.createElement('div');
+        otherDetails.className = 'cinematography-other-details';
+        let detailsHtml = '';
+        if (promptData.cinematography.camera_movement) {
+            detailsHtml += `<div><strong>Camera Movement:</strong> <span>${promptData.cinematography.camera_movement}</span></div>`;
+        }
+        if (promptData.cinematography.framing) {
+            detailsHtml += `<div><strong>Framing:</strong> <span>${promptData.cinematography.framing}</span></div>`;
+        }
+        if (promptData.cinematography.depth_of_field) {
+            detailsHtml += `<div><strong>Depth of Field:</strong> <span>${promptData.cinematography.depth_of_field}</span></div>`;
+        }
+        if(detailsHtml) {
+            otherDetails.innerHTML = detailsHtml;
+            cinematographyContainer.appendChild(otherDetails);
+        }
+    }
+
+
     // --- Sound Effects Section ---
     const sfxContainer = document.createElement('div');
     sfxContainer.className = 'sound-effects-container';
@@ -604,6 +655,9 @@ function displayEnhancedPrompt(promptData: any) {
     }
     if (lightingContainer.hasChildNodes()) {
         promptCard.appendChild(lightingContainer);
+    }
+    if (cinematographyContainer.hasChildNodes()) {
+        promptCard.appendChild(cinematographyContainer);
     }
     if (sfxContainer.hasChildNodes()) {
         promptCard.appendChild(sfxContainer);
