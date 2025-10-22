@@ -232,15 +232,22 @@
 
                 <div class="video-generation">
                     <h2 class="section-title"><i class="fas fa-film"></i> Video Generation</h2>
+                    <div id="api-key-gate" class="api-key-gate" style="display: none;">
+                        <h3><i class="fas fa-key"></i> API Key Required for Veo Models</h3>
+                        <p>To generate videos with Veo, you must select an API key. For information on pricing, please see the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer">billing documentation</a>.</p>
+                        <button id="select-api-key-btn">
+                            <i class="fas fa-hand-pointer"></i> Select API Key
+                        </button>
+                    </div>
                     <div class="form-group">
                         <label>Choose a Model Preset</label>
                          <div class="video-model-presets" id="video-model-presets">
-                            <button class="video-model-preset" data-model="veo-standard">
+                            <button class="video-model-preset" data-model="veo-standard" data-is-veo="true">
                                 <i class="fas fa-video"></i>
                                 <span>Standard Veo</span>
                                 <p>Balanced quality and speed for general use.</p>
                             </button>
-                             <button class="video-model-preset" data-model="veo-cinematic">
+                             <button class="video-model-preset" data-model="veo-cinematic" data-is-veo="true">
                                 <i class="fas fa-theater-masks"></i>
                                 <span>Cinematic Veo</span>
                                 <p>High-fidelity, dramatic visuals, and lighting.</p>
@@ -257,7 +264,7 @@
                             </button>
                         </div>
                     </div>
-                    <div class="video-preview">
+                    <div class="video-preview" id="video-preview-container">
                         <div class="placeholder">Video will appear here after generation</div>
                     </div>
                     <button id="generate-video-btn" disabled>

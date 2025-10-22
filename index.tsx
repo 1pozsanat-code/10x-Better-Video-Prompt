@@ -15,10 +15,15 @@ const chatInput = document.getElementById('chat-input') as HTMLInputElement;
 const sendChatBtn = document.getElementById('send-chat-btn') as HTMLButtonElement;
 const chatMessagesContainer = document.getElementById('chat-messages');
 const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLButtonElement;
-const videoPreview = document.querySelector('.video-preview');
+const videoPreviewContainer = document.getElementById('video-preview-container');
 const stylePresetsContainer = document.getElementById('style-presets');
 const savedPromptsContainer = document.getElementById('saved-prompts-container');
 const searchSuggestionsContainer = document.getElementById('search-suggestions-container');
+
+// API Key Gate selectors
+const apiKeyGate = document.getElementById('api-key-gate');
+const selectApiKeyBtn = document.getElementById('select-api-key-btn') as HTMLButtonElement;
+
 
 // Image Upload Elements
 const imageUploadInput = document.getElementById('image-upload-input') as HTMLInputElement;
@@ -85,6 +90,8 @@ let firstFrameBase64: string | null = null;
 let lastFrameBase64: string | null = null;
 let searchSuggestionTimeout: number | null = null;
 let selectedVideoModelPreset: string | null = 'veo-standard';
+let isApiKeySelected = false;
+
 
 // Viewfinder state
 let currentSceneData: any | null = null;
@@ -499,6 +506,7 @@ function displayEnhancedPrompt(promptData: any) {
 
     const simpleTextContent = document.createElement('div');
     simpleTextContent.className = 'prompt-content simple-text-content placeholder';
+    simpleTextContent.id = 'simple-text-content-container'; // Add ID for easier selection
     simpleTextContent.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating simplified text...`;
     
     // --- Exclusions Section ---
@@ -598,7 +606,8 @@ function displayEnhancedPrompt(promptData: any) {
         vfxSuggestionsContainer.style.display = 'none'; // Hide if not enough info
     }
 
-    generateVideoBtn.disabled = false;
+    generateVideoBtn.disabled = !isApiKeySelected && (videoModelPresetsContainer.querySelector('.active') as HTMLElement)?.dataset?.isVeo === 'true';
+
     setupInteractiveViewfinder(promptData.scene);
 
     // Enable 'Use Subject' and 'Suggest' buttons for frame generation
@@ -1674,6 +1683,12 @@ function handlePromptInput() {
     }, 1500); // Wait 1.5 seconds after user stops typing
 }
 
+/** Resets the UI to show the API key gate */
+function resetApiKeyGate() {
+    apiKeyGate.style.display = 'block';
+    isApiKeySelected = false;
+    generateVideoBtn.disabled = true;
+}
 
 // 5. Main logic and event listeners
 async function main() {
@@ -1825,8 +1840,27 @@ async function startChat() {
     }
 }
 
+async function initApiKeyCheck() {
+    try {
+        if (await window.aistudio.hasSelectedApiKey()) {
+            apiKeyGate.style.display = 'none';
+            isApiKeySelected = true;
+            if (currentEnhancedPrompt) {
+                generateVideoBtn.disabled = false;
+            }
+        } else {
+            resetApiKeyGate();
+        }
+    } catch (e) {
+        // Fallback for environments where aistudio is not available
+        console.warn("aistudio.hasSelectedApiKey() not available. Hiding API key gate.");
+        apiKeyGate.style.display = 'none';
+        isApiKeySelected = true;
+    }
+}
 
-function init() {
+
+async function init() {
     chat = ai.chats.create({ model: chatModel });
     
     // Event listeners
@@ -1858,7 +1892,7 @@ function init() {
     // Style Preset listeners
     stylePresetsContainer.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        const button = target.closest('.style-preset-btn');
+        const button = target.closest('.style-preset-card');
         if (!button) return;
 
         const style = (button as HTMLElement).dataset.style;
@@ -1961,13 +1995,37 @@ function init() {
         if (!button) return;
 
         const model = (button as HTMLElement).dataset.model;
+        const isVeo = (button as HTMLElement).dataset.isVeo === 'true';
 
         videoModelPresetsContainer.querySelectorAll('.video-model-preset').forEach(b => b.classList.remove('active'));
         button.classList.add('active');
         selectedVideoModelPreset = model;
+        
+        // Disable generate button if a Veo model is selected and no API key is present
+        if(isVeo) {
+            generateVideoBtn.disabled = !isApiKeySelected;
+        } else {
+             generateVideoBtn.disabled = !currentEnhancedPrompt;
+        }
     });
+    
+    // API Key listener
+    selectApiKeyBtn.onclick = async () => {
+        try {
+            await window.aistudio.openSelectKey();
+            // Assume success to avoid race condition
+            apiKeyGate.style.display = 'none';
+            isApiKeySelected = true;
+            if (currentEnhancedPrompt) {
+                generateVideoBtn.disabled = false;
+            }
+        } catch(e) {
+            console.error("Error opening API key selection:", e);
+            showNotification("Could not open API key selection dialog.");
+        }
+    };
 
-    generateVideoBtn.onclick = () => {
+    generateVideoBtn.onclick = async () => {
         if (!currentEnhancedPrompt) {
             showNotification("Error: Please enhance a prompt first.");
             return;
@@ -1977,20 +2035,106 @@ function init() {
             return;
         }
 
-        const preview = document.querySelector('.video-preview');
-        preview.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i><p>Generating with '${selectedVideoModelPreset}' model...</p></div>`;
-        
-        showNotification(`Simulating video generation with ${selectedVideoModelPreset}...`);
+        const activePreset = videoModelPresetsContainer.querySelector('.active') as HTMLElement;
+        const isVeo = activePreset?.dataset.isVeo === 'true';
 
-        setTimeout(() => {
-             preview.innerHTML = `<div class="placeholder" style="padding: 0; height: 100%;"><p style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;">Simulation complete!</p><video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;"><source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"></video></div>`;
-        }, 3000);
+        if (isVeo) {
+            // Real Veo Generation
+            const simplifiedPromptEl = document.getElementById('simple-text-content-container');
+            if (!simplifiedPromptEl || simplifiedPromptEl.classList.contains('placeholder')) {
+                showNotification("Simplified prompt is not ready yet.");
+                return;
+            }
+            const prompt = simplifiedPromptEl.textContent;
+
+            const loadingMessages = [
+                `Request sent to '${selectedVideoModelPreset}'...`,
+                "This can take a few minutes. Please wait.",
+                "Still rendering your masterpiece...",
+                "Applying cinematic touches...",
+                "Finalizing video... almost there!"
+            ];
+            let messageIndex = 0;
+            videoPreviewContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i><p>${loadingMessages[messageIndex]}</p></div>`;
+            const messageInterval = setInterval(() => {
+                messageIndex = (messageIndex + 1) % loadingMessages.length;
+                const p = videoPreviewContainer.querySelector('p');
+                if (p) p.textContent = loadingMessages[messageIndex];
+            }, 8000);
+
+            try {
+                // Create a fresh client instance to ensure the latest key is used
+                const videoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                
+                const modelMap: { [key: string]: string } = {
+                    'veo-standard': 'veo-3.1-fast-generate-preview',
+                    'veo-cinematic': 'veo-3.1-generate-preview'
+                };
+                
+                const payload: any = {
+                    model: modelMap[selectedVideoModelPreset],
+                    prompt: prompt,
+                    config: {
+                        numberOfVideos: 1,
+                        resolution: '720p',
+                        aspectRatio: '16:9'
+                    }
+                };
+                
+                if (firstFrameBase64) {
+                    payload.image = { imageBytes: firstFrameBase64, mimeType: 'image/png' };
+                    if (lastFrameBase64) {
+                        payload.config.lastFrame = { imageBytes: lastFrameBase64, mimeType: 'image/png' };
+                    }
+                }
+                
+                let operation = await videoAi.models.generateVideos(payload);
+                
+                while (!operation.done) {
+                    await new Promise(resolve => setTimeout(resolve, 10000));
+                    operation = await videoAi.operations.getVideosOperation({ operation: operation });
+                }
+
+                clearInterval(messageInterval);
+
+                const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+                if (downloadLink) {
+                     const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                     const videoBlob = await response.blob();
+                     const videoUrl = URL.createObjectURL(videoBlob);
+                     videoPreviewContainer.innerHTML = `<video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;" src="${videoUrl}"></video>`;
+                } else {
+                    throw new Error("Video generation completed, but no download link was found.");
+                }
+
+            } catch (error: any) {
+                 clearInterval(messageInterval);
+                 console.error("Video generation failed:", error);
+                 let errorMessage = "Video generation failed. Please check the console for details.";
+                 if (error.message.includes("Requested entity was not found")) {
+                     errorMessage = "API Key is invalid or expired. Please select a valid key.";
+                     resetApiKeyGate();
+                 }
+                 videoPreviewContainer.innerHTML = `<div class="placeholder error" style="color: #ff8a80;"><i class="fas fa-exclamation-triangle"></i><p>${errorMessage}</p></div>`;
+            }
+
+        } else {
+            // Simulation
+            videoPreviewContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i><p>Simulating generation with '${selectedVideoModelPreset}' model...</p></div>`;
+            showNotification(`Simulating video generation with ${selectedVideoModelPreset}...`);
+
+            setTimeout(() => {
+                 videoPreviewContainer.innerHTML = `<div class="placeholder" style="padding: 0; height: 100%;"><p style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;">Simulation complete!</p><video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;"><source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"></video></div>`;
+            }, 3000);
+        }
     };
 
 
     // Initial setup
     renderSavedPrompts();
     generateAndDisplayExamplePrompts();
+    initApiKeyCheck();
+
     // Populate SFX presets
     const sfxPresets = ['Tense cinematic music', 'Futuristic synthwave', 'Heavy footsteps on metal', 'Explosion in the distance', 'Rain and thunder', 'Glitched digital sounds'];
     sfxPresets.forEach(preset => {
