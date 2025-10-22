@@ -183,9 +183,18 @@ const videoPromptSchema = {
             description: 'Lighting setup for the scene.',
             properties: {
                 type: { type: Type.STRING, description: 'Primary type of lighting (e.g., "Natural sunlight", "Studio lighting", "Neon glow").' },
-                quality: { type: Type.STRING, description: 'Quality of the light (e.g., "Hard shadows, high contrast", "Soft diffused light").' },
-                color_temperature: { type: Type.STRING, description: 'Color tones of the light (e.g., "Warm golden hour", "Cool blue tones").' },
-                key_light_source: { type: Type.STRING, description: 'The direction and nature of the main light source (e.g., "Top-down moonlight", "Side-lit from a window").' },
+                quality: { 
+                    type: Type.STRING, 
+                    description: 'Quality of the light. Be specific, using terms like "Hard shadows with high contrast", "Soft diffused light creating a gentle glow", "Dappled light through foliage", or "Sharp specular highlights on wet surfaces".' 
+                },
+                color_temperature: { 
+                    type: Type.STRING, 
+                    description: 'Color tones of the light. Be evocative with examples like "Warm golden hour sunlight", "Cool, sterile blue tones of a medical lab", "Vibrant neon pink and cyan glow", or "Fiery orange of a sunset".' 
+                },
+                key_light_source: { 
+                    type: Type.STRING, 
+                    description: 'The direction, intensity, and nature of the main light source. Specify both direction and intensity (e.g., "Bright, top-down moonlight", "Soft side-light from a large window", "Harsh, direct overhead spotlight", "Faint, flickering light from a distant fire").' 
+                },
                 fill_light_intensity: { type: Type.STRING, description: 'The intensity of the fill light, which softens shadows (e.g., "Low", "Medium", "None").' },
                 backlight_effect: { type: Type.STRING, description: 'The effect of the backlight, which separates the subject from the background (e.g., "Rim lighting for a halo effect", "Silhouette", "None").' },
                 special_effects: { type: Type.STRING, description: 'Any other special lighting effects (e.g., "Lens flare", "God rays", "Flickering lights"). Can be "None".' },
@@ -2101,7 +2110,7 @@ async function main() {
 
         // Step 2: Generate the main video prompt
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing details...';
-        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt. For the 'shot_sequence', also suggest a suitable 'transition_to_next_shot' (e.g., 'Cut', 'Dissolve', 'Fade to Black') for all but the final shot.
+        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt. For the 'shot_sequence', also suggest a suitable 'transition_to_next_shot' (e.g., 'Cut', 'Dissolve', 'Fade to Black') for all but the final shot. For 'technical.color_grading', suggest a specific color grading style that complements the mood and style of the video, such as 'Desaturated cool tones', 'Warm vintage look', or 'High contrast cyberpunk'.
 
 User's Idea: "${textPrompt}"`;
 
