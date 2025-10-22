@@ -376,6 +376,44 @@ button:disabled {
     color: rgba(255, 255, 255, 0.8);
 }
 
+.lighting-container {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.lighting-container > strong { /* The header */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-weight: 500;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+.lighting-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+.lighting-item {
+    background: rgba(0,0,0,0.2);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+.lighting-item strong { /* The key/title inside the item */
+    color: #feb47b;
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.lighting-item span {
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .chatbot {
     background: rgba(255, 255, 255, 0.08);
     border-radius: 15px;

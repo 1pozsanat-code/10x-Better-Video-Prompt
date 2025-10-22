@@ -521,6 +521,38 @@ function displayEnhancedPrompt(promptData: any) {
         exclusionsContainer.appendChild(exclusionText);
     }
 
+    // --- Lighting Section ---
+    const lightingContainer = document.createElement('div');
+    lightingContainer.className = 'lighting-container';
+    if (promptData.lighting) {
+        const header = document.createElement('strong');
+        header.innerHTML = '<i class="fas fa-lightbulb"></i> Lighting Setup';
+        lightingContainer.appendChild(header);
+
+        const lightingGrid = document.createElement('div');
+        lightingGrid.className = 'lighting-grid';
+
+        const lightingDetails = {
+            'Type': promptData.lighting.type,
+            'Quality': promptData.lighting.quality,
+            'Color': promptData.lighting.color_temperature,
+            'Key Source': promptData.lighting.key_light_source,
+            'Fill Intensity': promptData.lighting.fill_light_intensity,
+            'Backlight': promptData.lighting.backlight_effect,
+            'Special Effects': promptData.lighting.special_effects,
+        };
+
+        for (const [key, value] of Object.entries(lightingDetails)) {
+            if (value && String(value).toLowerCase() !== 'none') {
+                const item = document.createElement('div');
+                item.className = 'lighting-item';
+                item.innerHTML = `<strong>${key}</strong><span>${value}</span>`;
+                lightingGrid.appendChild(item);
+            }
+        }
+        lightingContainer.appendChild(lightingGrid);
+    }
+
     // --- Sound Effects Section ---
     const sfxContainer = document.createElement('div');
     sfxContainer.className = 'sound-effects-container';
@@ -569,6 +601,9 @@ function displayEnhancedPrompt(promptData: any) {
     promptCard.appendChild(simpleTextContent);
     if (exclusionsContainer.hasChildNodes()) {
         promptCard.appendChild(exclusionsContainer);
+    }
+    if (lightingContainer.hasChildNodes()) {
+        promptCard.appendChild(lightingContainer);
     }
     if (sfxContainer.hasChildNodes()) {
         promptCard.appendChild(sfxContainer);
