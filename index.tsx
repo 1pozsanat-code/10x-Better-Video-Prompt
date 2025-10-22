@@ -80,8 +80,11 @@ const useSubjectLastBtn = document.getElementById('use-subject-last') as HTMLBut
 const suggestFirstFrameBtn = document.getElementById('suggest-first-frame-btn') as HTMLButtonElement;
 const suggestLastFrameBtn = document.getElementById('suggest-last-frame-btn') as HTMLButtonElement;
 
-// Video Model Preset selectors
+// Video Generation Controls
 const videoModelSelect = document.getElementById('video-model-select') as HTMLSelectElement;
+const resolutionSelect = document.getElementById('resolution-select') as HTMLSelectElement;
+const frameRateSelect = document.getElementById('frame-rate-select') as HTMLSelectElement;
+const aspectRatioSelect = document.getElementById('aspect-ratio-select') as HTMLSelectElement;
 
 
 // 3. State variables
@@ -120,7 +123,6 @@ const videoPromptSchema = {
             description: 'Metadata for the video generation model.',
             properties: {
                 style: { type: Type.STRING, description: 'The overall style of the video (e.g., "sci-fi action thriller", "cinematic").' },
-                aspect_ratio: { type: Type.STRING, description: 'Aspect ratio (e.g., "16:9", "21:9").' },
                 duration: { type: Type.STRING, description: 'Target duration (e.g., "30s").' },
                 mood: { type: Type.STRING, description: 'The emotional tone of the video.' },
                 negative_prompt: { 
@@ -128,7 +130,7 @@ const videoPromptSchema = {
                     description: 'A concise summary of elements, styles, or concepts to explicitly exclude from the video. Can be "none" if no exclusions are provided.' 
                 },
             },
-            required: ['style', 'aspect_ratio', 'duration', 'mood'],
+            required: ['style', 'duration', 'mood'],
         },
         scene: {
             type: Type.OBJECT,
@@ -212,9 +214,10 @@ const videoPromptSchema = {
             properties: {
                 resolution: { type: Type.STRING, description: 'e.g., "4K Ultra HD"' },
                 frame_rate: { type: Type.STRING, description: 'e.g., "30fps"' },
+                aspect_ratio: { type: Type.STRING, description: 'Aspect ratio (e.g., "16:9", "21:9").' },
                 color_grading: { type: Type.STRING, description: 'Post-production color style.' },
             },
-            required: ['resolution', 'frame_rate', 'color_grading'],
+            required: ['resolution', 'frame_rate', 'aspect_ratio', 'color_grading'],
         },
         vfx_elements: {
             type: Type.ARRAY,
@@ -799,6 +802,17 @@ function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = n
         generateVideoBtn.disabled = !isApiKeySelected;
     } else {
         generateVideoBtn.disabled = false; // For simulated models, only depends on prompt being present
+    }
+
+    // --- Populate and enable technical controls ---
+    if (promptData.technical) {
+        resolutionSelect.value = promptData.technical.resolution || '1080p Full HD';
+        frameRateSelect.value = promptData.technical.frame_rate || '30fps';
+        aspectRatioSelect.value = promptData.technical.aspect_ratio || '16:9';
+        
+        resolutionSelect.disabled = false;
+        frameRateSelect.disabled = false;
+        aspectRatioSelect.disabled = false;
     }
 
     setupInteractiveViewfinder(promptData.scene);
@@ -2056,6 +2070,15 @@ function resetAllInputs() {
     // Video generation
     videoPreviewContainer.innerHTML = '<div class="placeholder">Video will appear here after generation</div>';
     videoModelSelect.selectedIndex = 0;
+    
+    // Reset and disable technical controls
+    aspectRatioSelect.selectedIndex = 0;
+    resolutionSelect.selectedIndex = 0;
+    frameRateSelect.selectedIndex = 0;
+    aspectRatioSelect.disabled = true;
+    resolutionSelect.disabled = true;
+    frameRateSelect.disabled = true;
+
     handleModelSelectionChange(); // This will also handle button disable state
 
     // Reset main button
@@ -2459,6 +2482,11 @@ async function init() {
 
     // Video Model Selection listener
     videoModelSelect.onchange = handleModelSelectionChange;
+
+    // Video Technical Controls listeners
+    aspectRatioSelect.onchange = (e) => updatePromptAndRefreshJSON('technical.aspect_ratio', (e.target as HTMLSelectElement).value);
+    resolutionSelect.onchange = (e) => updatePromptAndRefreshJSON('technical.resolution', (e.target as HTMLSelectElement).value);
+    frameRateSelect.onchange = (e) => updatePromptAndRefreshJSON('technical.frame_rate', (e.target as HTMLSelectElement).value);
     
     // API Key listener
     selectApiKeyBtn.onclick = async () => {

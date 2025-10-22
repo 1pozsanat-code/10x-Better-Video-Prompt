@@ -266,18 +266,52 @@
                             <i class="fas fa-hand-pointer"></i> Select API Key
                         </button>
                     </div>
-                    <div class="form-group">
-                        <label for="video-model-select">Choose a Video Generation Model</label>
-                        <div class="select-wrapper">
-                            <select id="video-model-select">
-                                <option value="veo-standard" data-is-veo="true">Standard Veo (Real)</option>
-                                <option value="veo-cinematic" data-is-veo="true">Cinematic Veo (Real)</option>
-                                <option value="svd" data-is-veo="false">SVD (Simulation)</option>
-                                <option value="cogvideox" data-is-veo="false">CogVideoX (Simulation)</option>
-                                <option value="lumina" data-is-veo="false">Lumina (Simulation)</option>
-                                <option value="stylus-animated" data-is-veo="false">Stylus Animated (Simulation)</option>
-                                <option value="frame-interpolation" data-is-veo="false">Frame Interpolation (Simulation)</option>
-                            </select>
+                    <div class="video-config-grid">
+                        <div class="form-group">
+                            <label for="video-model-select">Video Model</label>
+                            <div class="select-wrapper">
+                                <select id="video-model-select">
+                                    <option value="veo-standard" data-is-veo="true">Standard Veo (Real)</option>
+                                    <option value="veo-cinematic" data-is-veo="true">Cinematic Veo (Real)</option>
+                                    <option value="svd" data-is-veo="false">SVD (Simulation)</option>
+                                    <option value="cogvideox" data-is-veo="false">CogVideoX (Simulation)</option>
+                                    <option value="lumina" data-is-veo="false">Lumina (Simulation)</option>
+                                    <option value="stylus-animated" data-is-veo="false">Stylus Animated (Simulation)</option>
+                                    <option value="frame-interpolation" data-is-veo="false">Frame Interpolation (Simulation)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="aspect-ratio-select">Aspect Ratio</label>
+                            <div class="select-wrapper">
+                                <select id="aspect-ratio-select" disabled>
+                                    <option value="16:9">16:9 (Widescreen)</option>
+                                    <option value="9:16">9:16 (Vertical)</option>
+                                    <option value="1:1">1:1 (Square)</option>
+                                    <option value="4:3">4:3 (Standard)</option>
+                                    <option value="21:9">21:9 (Cinemascope)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="resolution-select">Resolution</label>
+                            <div class="select-wrapper">
+                                <select id="resolution-select" disabled>
+                                    <option value="4K Ultra HD">4K Ultra HD</option>
+                                    <option value="1080p Full HD">1080p Full HD</option>
+                                    <option value="720p HD">720p HD</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="frame-rate-select">Frame Rate</label>
+                            <div class="select-wrapper">
+                                <select id="frame-rate-select" disabled>
+                                    <option value="24fps">24fps (Cinematic)</option>
+                                    <option value="30fps">30fps (Standard)</option>
+                                    <option value="60fps">60fps (Smooth)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="video-preview" id="video-preview-container">

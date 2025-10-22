@@ -1462,6 +1462,20 @@ select:focus {
     border-color: #7be8feb4; /* A different highlight color for variety */
 }
 
+/* -- Video Config Grid Styles -- */
+.video-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 500px) {
+    .video-config-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* -- API Key Gate Styles -- */
 .api-key-gate {
     background: rgba(255, 180, 123, 0.1);
