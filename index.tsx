@@ -21,6 +21,7 @@ const savedPromptsContainer = document.getElementById('saved-prompts-container')
 const searchSuggestionsContainer = document.getElementById('search-suggestions-container');
 const nsfwToggle = document.getElementById('nsfw-toggle') as HTMLInputElement;
 const nsfwDisclaimer = document.getElementById('nsfw-disclaimer');
+const resetPromptBtn = document.getElementById('reset-prompt-btn') as HTMLButtonElement;
 
 
 // API Key Gate selectors
@@ -1788,6 +1789,85 @@ function resetApiKeyGate() {
     generateVideoBtn.disabled = true;
 }
 
+/** Resets all user inputs and UI states to their default values */
+function resetAllInputs() {
+    // Main prompts
+    promptInput.value = '';
+    negativePromptInput.value = '';
+    clearSearchSuggestions();
+
+    // NSFW toggle
+    nsfwToggle.checked = false;
+    if (nsfwDisclaimer) nsfwDisclaimer.style.display = 'none';
+
+    // Negative prompt feedback
+    if(negativePromptFeedback) negativePromptFeedback.style.display = 'none';
+
+    // SFX
+    addedSoundEffects = [];
+    updateSFXList();
+    sfxCustomInput.value = '';
+
+    // Style preset
+    selectedStylePreset = null;
+    stylePresetsContainer.querySelectorAll('.style-preset-card').forEach(c => c.classList.remove('active'));
+
+    // Image analysis
+    imageUploadInput.value = ''; // Clear file input
+    uploadedImageBase64 = null;
+    imagePreview.src = '';
+    imagePreview.style.display = 'none';
+    if(imagePlaceholder) imagePlaceholder.style.display = 'block';
+    analyzeImageBtn.disabled = true;
+    imageAnalysisHintInput.value = '';
+
+    // Reset results and state
+    currentEnhancedPrompt = null;
+    resultsContainer.innerHTML = '<div class="placeholder">Your enhanced prompts will appear here...</div>';
+
+    // Reset viewfinder
+    if(viewfinderDisplay) viewfinderDisplay.innerHTML = '<div class="placeholder">Generate an enhanced prompt to activate the viewfinder.</div>';
+    if(viewfinderControls) viewfinderControls.style.display = 'none';
+    if (tiltSuggestionsContainer) tiltSuggestionsContainer.innerHTML = '';
+    
+    // Reset catalysts
+    if (catalystsContainer) {
+         catalystsContainer.innerHTML = 'Generate an enhanced prompt to see dynamic suggestions.';
+         catalystsContainer.classList.add('placeholder');
+    }
+
+    // VFX (needs currentEnhancedPrompt to be null)
+    updateVFXList();
+    vfxCustomInput.value = '';
+
+    // Frame generation
+    firstFramePrompt.value = '';
+    lastFramePrompt.value = '';
+    firstFrameBase64 = null;
+    lastFrameBase64 = null;
+    firstFramePreviewContainer.innerHTML = '<span class="placeholder-text"><i class="fas fa-image"></i></span>';
+    lastFramePreviewContainer.innerHTML = '<span class="placeholder-text"><i class="fas fa-image"></i></span>';
+    useSubjectFirstBtn.disabled = true;
+    useSubjectLastBtn.disabled = true;
+    suggestFirstFrameBtn.disabled = true;
+    suggestLastFrameBtn.disabled = true;
+
+    // Video generation
+    videoPreviewContainer.innerHTML = '<div class="placeholder">Video will appear here after generation</div>';
+    videoModelSelect.selectedIndex = 0;
+    handleModelSelectionChange(); // This will also handle button disable state
+
+    // Reset main button
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = '<i class="fas fa-magic"></i> Enhance Prompt';
+
+    // Show notification
+    showNotification("All inputs have been reset.");
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 // 5. Main logic and event listeners
 async function main() {
     clearSearchSuggestions(); // Clear any suggestions when generating
@@ -1985,6 +2065,7 @@ async function init() {
     
     // Event listeners
     generateBtn.onclick = main;
+    resetPromptBtn.onclick = resetAllInputs;
     promptInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             main();
