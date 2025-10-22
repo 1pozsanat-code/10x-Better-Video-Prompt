@@ -1446,3 +1446,72 @@ select:focus {
 #select-api-key-btn {
     width: 100%;
 }
+
+/* --- NSFW Toggle Styles --- */
+.nsfw-toggle-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 99, 132, 0.1);
+    padding: 10px 15px;
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.nsfw-toggle-group > label {
+    font-weight: 500;
+    flex-basis: 200px;
+}
+
+.toggle-switch-container {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+
+.toggle-switch {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider-label {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #555;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider-label:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-switch:checked + .slider-label {
+    background-color: #ff6384;
+}
+
+.toggle-switch:checked + .slider-label:before {
+    transform: translateX(22px);
+}
+
+.disclaimer-text {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 8px;
+    flex-basis: 100%;
+    line-height: 1.4;
+}

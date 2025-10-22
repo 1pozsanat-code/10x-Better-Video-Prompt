@@ -33,6 +33,16 @@
                     <textarea id="prompt" placeholder="Example: A majestic dragon flying through a cyberpunk city at night..."></textarea>
                     <div id="search-suggestions-container" class="search-suggestions-container" style="display: none;"></div>
                 </div>
+                <div class="form-group nsfw-toggle-group">
+                    <label for="nsfw-toggle">Enable NSFW Content</label>
+                    <div class="toggle-switch-container">
+                        <input type="checkbox" id="nsfw-toggle" class="toggle-switch">
+                        <label for="nsfw-toggle" class="slider-label"></label>
+                    </div>
+                    <p id="nsfw-disclaimer" class="disclaimer-text" style="display: none;">
+                        You have enabled NSFW content generation. You are solely responsible for the output and must comply with our terms of service.
+                    </p>
+                </div>
                 <div class="form-group">
                     <div class="form-group-header">
                         <label for="negative-prompt">Exclusion Criteria (Negative Prompt)</label>

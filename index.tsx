@@ -19,6 +19,9 @@ const videoPreviewContainer = document.getElementById('video-preview-container')
 const stylePresetsContainer = document.getElementById('style-presets');
 const savedPromptsContainer = document.getElementById('saved-prompts-container');
 const searchSuggestionsContainer = document.getElementById('search-suggestions-container');
+const nsfwToggle = document.getElementById('nsfw-toggle') as HTMLInputElement;
+const nsfwDisclaimer = document.getElementById('nsfw-disclaimer');
+
 
 // API Key Gate selectors
 const apiKeyGate = document.getElementById('api-key-gate');
@@ -1833,6 +1836,10 @@ User's Idea: "${textPrompt}"`;
             generationPrompt += `\n\nMandatory Sound Effects: Ensure these sound effects are included: ${addedSoundEffects.join(', ')}.`;
         }
 
+        if (nsfwToggle.checked) {
+            generationPrompt += `\n\nNSFW Content Enabled: The user has confirmed they are responsible for the generated content. Generate content accordingly.`;
+        }
+
         const response = await ai.models.generateContent({
             model: model,
             contents: generationPrompt,
@@ -1984,6 +1991,24 @@ async function init() {
         }
     });
     promptInput.addEventListener('input', handlePromptInput);
+
+    nsfwToggle.addEventListener('change', () => {
+        if (nsfwToggle.checked) {
+            const confirmed = confirm(
+                "Warning: You are enabling NSFW content generation.\n\n" +
+                "By proceeding, you acknowledge that you are solely responsible for the generated content and must comply with all applicable laws and our terms of service. " +
+                "The generated content may be explicit.\n\n" +
+                "Do you accept these terms and wish to continue?"
+            );
+            if (confirmed) {
+                if (nsfwDisclaimer) nsfwDisclaimer.style.display = 'block';
+            } else {
+                nsfwToggle.checked = false;
+            }
+        } else {
+            if (nsfwDisclaimer) nsfwDisclaimer.style.display = 'none';
+        }
+    });
 
 
     imageUploadInput.onchange = handleImageUpload;
