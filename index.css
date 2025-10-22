@@ -1458,9 +1458,9 @@ select:focus {
     flex-wrap: wrap;
 }
 
-.nsfw-toggle-group > label {
+.nsfw-toggle-text-label {
     font-weight: 500;
-    flex-basis: 200px;
+    flex-grow: 1;
 }
 
 .toggle-switch-container {
@@ -1468,6 +1468,8 @@ select:focus {
     display: inline-block;
     width: 50px;
     height: 28px;
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .toggle-switch {
@@ -1478,7 +1480,6 @@ select:focus {
 
 .slider-label {
     position: absolute;
-    cursor: pointer;
     top: 0;
     left: 0;
     right: 0;
