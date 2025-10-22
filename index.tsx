@@ -1993,20 +1993,8 @@ async function init() {
     promptInput.addEventListener('input', handlePromptInput);
 
     nsfwToggle.addEventListener('change', () => {
-        if (nsfwToggle.checked) {
-            const confirmed = confirm(
-                "Warning: You are enabling NSFW content generation.\n\n" +
-                "By proceeding, you acknowledge that you are solely responsible for the generated content and must comply with all applicable laws and our terms of service. " +
-                "The generated content may be explicit.\n\n" +
-                "Do you accept these terms and wish to continue?"
-            );
-            if (confirmed) {
-                if (nsfwDisclaimer) nsfwDisclaimer.style.display = 'block';
-            } else {
-                nsfwToggle.checked = false;
-            }
-        } else {
-            if (nsfwDisclaimer) nsfwDisclaimer.style.display = 'none';
+        if (nsfwDisclaimer) {
+            nsfwDisclaimer.style.display = nsfwToggle.checked ? 'block' : 'none';
         }
     });
 

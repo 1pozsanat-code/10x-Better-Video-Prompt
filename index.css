@@ -1517,3 +1517,8 @@ select:focus {
     flex-basis: 100%;
     line-height: 1.4;
 }
+
+.disclaimer-text strong {
+    color: #ff8a80;
+    font-weight: 600;
+}
