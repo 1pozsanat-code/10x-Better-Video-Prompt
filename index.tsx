@@ -162,6 +162,10 @@ const videoPromptSchema = {
                             purpose: {
                                 type: Type.STRING,
                                 description: 'The narrative purpose of this shot (e.g., "Introduce the character", "Build tension", "Reveal the obstacle", "Climax of the action").'
+                            },
+                            transition_to_next_shot: {
+                                type: Type.STRING,
+                                description: 'The transition effect to the next shot (e.g., "Cut", "Fade to Black", "Dissolve"). Omitted for the last shot.'
                             }
                         },
                         required: ['shot_type', 'description', 'purpose']
@@ -485,7 +489,7 @@ function updatePromptAndRefreshJSON(path: string, value: any) {
     if (!currentEnhancedPrompt) return;
 
     // Use a simple loop to navigate the path and set the value
-    const keys = path.split('.');
+    const keys = path.split(/[\.\[\]]/).filter(Boolean); // Handles array paths like 'shot_sequence[0]'
     let current: any = currentEnhancedPrompt;
     for (let i = 0; i < keys.length - 1; i++) {
         if (!current[keys[i]]) { // Create path if it doesn't exist
@@ -643,6 +647,34 @@ function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = n
                 </div>
             `;
             timeline.appendChild(item);
+
+            // --- Add transition selector if not the last shot ---
+            if (index < promptData.cinematography.shot_sequence.length - 1) {
+                const connector = document.createElement('div');
+                connector.className = 'transition-connector';
+
+                const select = document.createElement('select');
+                select.className = 'transition-select';
+                select.title = 'Select transition to next shot';
+                
+                const transitions = ['Cut', 'Fade to Black', 'Fade In', 'Dissolve', 'Wipe (Left to Right)', 'Wipe (Top to Bottom)'];
+                transitions.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t;
+                    option.textContent = t;
+                    select.appendChild(option);
+                });
+
+                select.value = shot.transition_to_next_shot || 'Cut'; // Default to Cut
+
+                select.onchange = (e) => {
+                    const newValue = (e.target as HTMLSelectElement).value;
+                    updatePromptAndRefreshJSON(`cinematography.shot_sequence[${index}].transition_to_next_shot`, newValue);
+                };
+                
+                connector.appendChild(select);
+                timeline.appendChild(connector);
+            }
         });
 
         cinematographyContainer.appendChild(timeline);
@@ -2092,7 +2124,7 @@ async function main() {
 
         // Step 2: Generate the main video prompt
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing details...';
-        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt.
+        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt. For the 'shot_sequence', also suggest a suitable 'transition_to_next_shot' (e.g., 'Cut', 'Dissolve', 'Fade to Black') for all but the final shot.
 
 User's Idea: "${textPrompt}"`;
 
