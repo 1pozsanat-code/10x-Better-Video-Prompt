@@ -1,3 +1,5 @@
+
+
 import { GoogleGenAI, Chat, Type, Modality } from "@google/genai";
 
 // 1. Initialize the Gemini AI Model
@@ -25,37 +27,61 @@ const imagePreview = document.getElementById('image-preview') as HTMLImageElemen
 const imagePlaceholder = document.getElementById('image-placeholder');
 const analyzeImageBtn = document.getElementById('analyze-image-btn') as HTMLButtonElement;
 
-// NEW Viewfinder selectors
+// Viewfinder selectors
 const viewfinderDisplay = document.getElementById('viewfinder-display');
 const viewfinderControls = document.getElementById('viewfinder-controls');
 const zoomSlider = document.getElementById('zoom-slider') as HTMLInputElement;
 const panSlider = document.getElementById('pan-slider') as HTMLInputElement;
 const tiltSlider = document.getElementById('tilt-slider') as HTMLInputElement;
+const apertureSlider = document.getElementById('aperture-slider') as HTMLInputElement;
+const shutterSpeedSlider = document.getElementById('shutter-speed-slider') as HTMLInputElement;
+const whiteBalanceSlider = document.getElementById('white-balance-slider') as HTMLInputElement;
+const tiltSuggestionsContainer = document.getElementById('tilt-suggestions-container');
 
-// NEW Scene Catalysts selector
+
+// Scene Catalysts selector
 const catalystsContainer = document.getElementById('catalysts-content');
 
-// NEW Negative Prompt Analysis selectors
+// Negative Prompt Analysis selectors
 const analyzeNegativeBtn = document.getElementById('analyze-negative-btn') as HTMLButtonElement;
 const negativePromptFeedback = document.getElementById('negative-prompt-feedback');
+
+// Sound Effects selectors
+const sfxPresetsContainer = document.getElementById('sfx-presets');
+const sfxCustomInput = document.getElementById('sfx-custom-input') as HTMLInputElement;
+const sfxAddBtn = document.getElementById('sfx-add-btn') as HTMLButtonElement;
+const sfxListContainer = document.getElementById('sfx-list-container');
+
+// Frame Generation selectors
+const generateFirstFrameBtn = document.getElementById('generate-first-frame-btn') as HTMLButtonElement;
+const generateLastFrameBtn = document.getElementById('generate-last-frame-btn') as HTMLButtonElement;
+const firstFramePrompt = document.getElementById('first-frame-prompt') as HTMLTextAreaElement;
+const lastFramePrompt = document.getElementById('last-frame-prompt') as HTMLTextAreaElement;
+const firstFramePreviewContainer = document.getElementById('first-frame-preview-container');
+const lastFramePreviewContainer = document.getElementById('last-frame-preview-container');
+const useSubjectFirstBtn = document.getElementById('use-subject-first') as HTMLButtonElement;
+const useSubjectLastBtn = document.getElementById('use-subject-last') as HTMLButtonElement;
 
 
 // 3. State variables
 let chat: Chat;
-let currentEnhancedPrompt: object | null = null;
+let currentEnhancedPrompt: any | null = null;
 let uploadedImageBase64: { mimeType: string, data: string } | null = null;
 let selectedStylePreset: string | null = null;
 let styleDescriptionsCache: any | null = null;
+let addedSoundEffects: string[] = [];
 const SAVED_PROMPTS_KEY = 'ai-video-prompts';
+let firstFrameBase64: string | null = null;
+let lastFrameBase64: string | null = null;
 
-// NEW Viewfinder state
+// Viewfinder state
 let currentSceneData: any | null = null;
-let tiltedDescriptionsCache: { gritty: any | null, epic: any | null } = {
+let tiltedVisualsCache: { gritty: any | null, epic: any | null } = {
     gritty: null,
     epic: null,
 };
 
-// NEW Audio state
+// Audio state
 let outputAudioContext: AudioContext | null = null;
 let currentlyPlayingSource: AudioBufferSourceNode | null = null;
 
@@ -131,6 +157,21 @@ const videoPromptSchema = {
             },
             required: ['type', 'quality', 'color_temperature', 'key_light_source', 'fill_light_intensity', 'backlight_effect'],
         },
+        sound_design: {
+            type: Type.OBJECT,
+            description: 'Details about the audio and sound effects for the scene.',
+            properties: {
+                key_effects: {
+                    type: Type.ARRAY,
+                    description: 'A list of 2-5 key sound effects to be included in the video. Can be specific sounds or musical cues.',
+                    items: { type: Type.STRING },
+                },
+                music: {
+                    type: Type.STRING,
+                    description: 'A brief description of the background music style (e.g., "Epic orchestral score", "Driving synthwave track", "Lo-fi beats"). Can be "None".'
+                }
+            }
+        },
         technical: {
             type: Type.OBJECT,
             description: 'Technical specifications for rendering.',
@@ -197,14 +238,32 @@ const imageAnalysisSchema = {
     required: ["analysis", "prompt_suggestions"]
 };
 
-const tiltedDescriptionsSchema = {
+const tiltedVisualsSchema = {
     type: Type.OBJECT,
     properties: {
-        subject: { type: Type.STRING, description: "The rewritten subject description." },
-        setting: { type: Type.STRING, description: "The rewritten setting description." },
-        environment: { type: Type.STRING, description: "The rewritten environment description." },
+        descriptions: {
+            type: Type.OBJECT,
+            properties: {
+                subject: { type: Type.STRING, description: "The rewritten subject description." },
+                setting: { type: Type.STRING, description: "The rewritten setting description." },
+                environment: { type: Type.STRING, description: "The rewritten environment description." },
+            },
+            required: ["subject", "setting", "environment"]
+        },
+        visual_suggestions: {
+            type: Type.ARRAY,
+            description: "An array of 2-3 subtle visual suggestions (e.g., lighting, VFX) that match the tone.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    effect: { type: Type.STRING, description: "A short name for the effect (e.g., 'Lens Flare', 'Atmospheric Haze')." },
+                    description: { type: Type.STRING, description: "A brief description of how to apply the effect to enhance the mood." }
+                },
+                required: ["effect", "description"]
+            }
+        }
     },
-    required: ["subject", "setting", "environment"]
+    required: ["descriptions", "visual_suggestions"]
 };
 
 const catalystSchema = {
@@ -354,6 +413,33 @@ function addMessage(text: string, sender: 'user' | 'bot') {
     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
 }
 
+/**
+ * Updates a value in the current enhanced prompt object and refreshes the JSON display.
+ * @param path A dot-notation string for the property path (e.g., "lighting.color_temperature").
+ * @param value The new value to set.
+ */
+function updatePromptAndRefreshJSON(path: string, value: any) {
+    if (!currentEnhancedPrompt) return;
+
+    // Use a simple loop to navigate the path and set the value
+    const keys = path.split('.');
+    let current: any = currentEnhancedPrompt;
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) { // Create path if it doesn't exist
+            current[keys[i]] = {};
+        }
+        current = current[keys[i]];
+    }
+    current[keys[keys.length - 1]] = value;
+
+    // Re-render the JSON in the results card to show the live update
+    const jsonContent = resultsContainer.querySelector('.prompt-content');
+    if (jsonContent) {
+        jsonContent.textContent = JSON.stringify(currentEnhancedPrompt, null, 2);
+    }
+}
+
+
 /** Displays the enhanced prompt in the results container */
 function displayEnhancedPrompt(promptData: any) {
     resultsContainer.innerHTML = '';
@@ -403,6 +489,21 @@ function displayEnhancedPrompt(promptData: any) {
         exclusionsContainer.appendChild(exclusionText);
     }
 
+    // --- Sound Effects Section ---
+    const sfxContainer = document.createElement('div');
+    sfxContainer.className = 'sound-effects-container';
+    if (promptData.sound_design?.key_effects?.length > 0) {
+        const strong = document.createElement('strong');
+        strong.innerHTML = '<i class="fas fa-volume-up"></i> Sound Design:';
+        sfxContainer.appendChild(strong);
+        promptData.sound_design.key_effects.forEach((sfx: string) => {
+            const sfxEl = document.createElement('span');
+            sfxEl.className = 'sound-effect-tag';
+            sfxEl.textContent = sfx;
+            sfxContainer.appendChild(sfxEl);
+        });
+    }
+
     // --- Tags Section ---
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'tags-container';
@@ -425,6 +526,9 @@ function displayEnhancedPrompt(promptData: any) {
     promptCard.appendChild(simpleTextContent);
     if (exclusionsContainer.hasChildNodes()) {
         promptCard.appendChild(exclusionsContainer);
+    }
+    if (sfxContainer.hasChildNodes()) {
+        promptCard.appendChild(sfxContainer);
     }
     promptCard.appendChild(tagsContainer);
     
@@ -454,10 +558,20 @@ function displayEnhancedPrompt(promptData: any) {
     generateVideoBtn.disabled = false;
     setupInteractiveViewfinder(promptData.scene);
 
+    // Enable 'Use Subject' buttons for frame generation
+    useSubjectFirstBtn.disabled = !promptData.scene?.subject;
+    useSubjectLastBtn.disabled = !promptData.scene?.subject;
+
+
     // --- Trigger catalyst generation ---
     if (catalystsContainer) {
-        catalystsContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Generating creative suggestions...</div>`;
-        catalystsContainer.classList.add('placeholder');
+        catalystsContainer.innerHTML = `
+            <div class="catalyst-loader">
+                <div class="spinner"></div>
+                <span>Brewing up creative sparks...</span>
+            </div>
+        `;
+        catalystsContainer.classList.remove('placeholder');
         generateSceneCatalysts(promptData.scene);
     }
 }
@@ -630,14 +744,19 @@ function setupInteractiveViewfinder(scene: any) {
 
     // Store data and reset caches for this new scene
     currentSceneData = scene;
-    tiltedDescriptionsCache = { gritty: null, epic: null };
+    tiltedVisualsCache = { gritty: null, epic: null };
 
     // Reset sliders to default positions
     zoomSlider.value = '100';
     panSlider.value = '0';
     tiltSlider.value = '0';
+    apertureSlider.value = '3';
+    shutterSpeedSlider.value = '3';
+    whiteBalanceSlider.value = '5500';
+
     
     viewfinderDisplay.innerHTML = ''; // Clear previous content
+    if (tiltSuggestionsContainer) tiltSuggestionsContainer.innerHTML = '';
     viewfinderControls.style.display = 'grid'; // Show controls
 
     const grid = document.createElement('div');
@@ -692,38 +811,55 @@ async function handleTiltContentUpdate() {
     if (!currentSceneData) return;
     const angleValue = parseInt(tiltSlider.value, 10);
 
-    let newDescriptions: any = null;
     let tone: 'gritty' | 'epic' | null = null;
     
     if (angleValue <= -20) tone = 'gritty';
     else if (angleValue >= 20) tone = 'epic';
 
-    if (tone) {
-        if (tiltedDescriptionsCache[tone]) {
-            newDescriptions = tiltedDescriptionsCache[tone];
-        } else {
-            newDescriptions = await generateTiltedDescriptions(tone);
-            if (newDescriptions) tiltedDescriptionsCache[tone] = newDescriptions; // Cache the result if successful
-        }
-    } else { // Neutral
-        newDescriptions = {
+    // Return to neutral state
+    if (!tone) {
+        const originalDescriptions = {
             subject: currentSceneData.subject,
             setting: currentSceneData.setting,
             environment: currentSceneData.environment,
-            // We don't modify antagonist
         };
+        updateViewfinderDescriptions(originalDescriptions);
+        displayTiltSuggestions([]); // Clear suggestions
+        return;
+    }
+
+    // Fetch or use cached data for the selected tone
+    let newVisuals: any = null;
+    if (tiltedVisualsCache[tone]) {
+        newVisuals = tiltedVisualsCache[tone];
+    } else {
+        newVisuals = await generateTiltedVisuals(tone);
+        if (newVisuals) tiltedVisualsCache[tone] = newVisuals;
     }
     
-    updateTiltDescriptions(newDescriptions);
+    if (newVisuals) {
+        updateViewfinderDescriptions(newVisuals.descriptions);
+        displayTiltSuggestions(newVisuals.visual_suggestions);
+    } else {
+         // Handle error case by resetting to original
+        const originalDescriptions = {
+            subject: currentSceneData.subject,
+            setting: currentSceneData.setting,
+            environment: currentSceneData.environment,
+        };
+        updateViewfinderDescriptions(originalDescriptions);
+        displayTiltSuggestions([]);
+    }
 }
 
-/** Fetches new descriptions from AI based on tone */
-async function generateTiltedDescriptions(tone: 'gritty' | 'epic'): Promise<any> {
+/** Fetches new descriptions and visual suggestions from AI based on tone */
+async function generateTiltedVisuals(tone: 'gritty' | 'epic'): Promise<any> {
     const allDescElements = document.querySelectorAll('.viewfinder-desc');
     allDescElements.forEach(el => el.classList.add('loading-tilt'));
+    if (tiltSuggestionsContainer) tiltSuggestionsContainer.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i></div>`;
 
     try {
-        const prompt = `Rewrite the following video scene descriptions to have a more "${tone}" and cinematic tone. Focus on evocative language that matches the requested tone. Provide the output as a JSON object with 'subject', 'setting', and 'environment' keys.
+        const prompt = `Rewrite the following video scene descriptions to have a more "${tone}" and cinematic tone. Focus on evocative language. Additionally, suggest 2-3 subtle visual effects (like lighting changes or atmospheric effects) that would enhance this tone. Provide the output as a JSON object with a 'descriptions' object (containing 'subject', 'setting', 'environment' keys) and a 'visual_suggestions' array.
 
 Original Subject: ${currentSceneData.subject}
 Original Setting: ${currentSceneData.setting}
@@ -734,21 +870,24 @@ Original Environment: ${currentSceneData.environment}
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: tiltedDescriptionsSchema,
+                responseSchema: tiltedVisualsSchema,
             },
         });
         return JSON.parse(response.text);
     } catch (error) {
-        console.error(`Error generating ${tone} descriptions:`, error);
-        showNotification(`Error: Could not generate ${tone} descriptions.`);
+        console.error(`Error generating ${tone} visuals:`, error);
+        showNotification(`Error: Could not generate ${tone} effects.`);
         return null; // Return null on error
     } finally {
         allDescElements.forEach(el => el.classList.remove('loading-tilt'));
+        if (tiltSuggestionsContainer && tiltSuggestionsContainer.querySelector('.placeholder')) {
+            tiltSuggestionsContainer.innerHTML = '';
+        }
     }
 }
 
 /** Updates the text content of the viewfinder elements with new descriptions */
-function updateTiltDescriptions(descriptions: any) {
+function updateViewfinderDescriptions(descriptions: any) {
     if (!descriptions) return;
     
     const elements = document.querySelectorAll('.viewfinder-element');
@@ -771,6 +910,65 @@ function updateTiltDescriptions(descriptions: any) {
         }
     });
 }
+
+/** Displays the visual suggestions from the tilt effect */
+function displayTiltSuggestions(suggestions: any[]) {
+    if (!tiltSuggestionsContainer) return;
+
+    tiltSuggestionsContainer.innerHTML = '';
+    if (!suggestions || suggestions.length === 0) {
+        return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'tilt-suggestions-grid';
+
+    suggestions.forEach(suggestion => {
+        const card = document.createElement('div');
+        card.className = 'tilt-suggestion-card';
+
+        const effectName = document.createElement('strong');
+        effectName.textContent = suggestion.effect;
+        
+        const effectDesc = document.createElement('p');
+        effectDesc.textContent = suggestion.description;
+
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'action-btn';
+        applyBtn.innerHTML = `<i class="fas fa-plus-circle"></i> Apply`;
+        applyBtn.onclick = () => applyTiltSuggestion(suggestion);
+
+        card.appendChild(effectName);
+        card.appendChild(effectDesc);
+        card.appendChild(applyBtn);
+        grid.appendChild(card);
+    });
+
+    tiltSuggestionsContainer.appendChild(grid);
+}
+
+/** Applies a visual suggestion to the main enhanced prompt */
+function applyTiltSuggestion(suggestion: { effect: string, description: string }) {
+    if (!currentEnhancedPrompt) {
+        showNotification("Error: No active prompt to apply suggestion to.");
+        return;
+    }
+    const suggestionText = `${suggestion.effect}: ${suggestion.description}`;
+    
+    const currentVfx = currentEnhancedPrompt.vfx_elements || [];
+    
+    if (currentVfx.includes(suggestionText)) {
+        showNotification("Suggestion already applied!");
+        return;
+    }
+    
+    const newVfx = [...currentVfx, suggestionText];
+    
+    updatePromptAndRefreshJSON('vfx_elements', newVfx);
+    
+    showNotification(`Applied: ${suggestion.effect}`);
+}
+
 
 /** Generates and displays example prompts for each style preset */
 async function generateAndDisplayExamplePrompts() {
@@ -803,373 +1001,57 @@ async function generateAndDisplayExamplePrompts() {
         const descriptions = JSON.parse(response.text);
         styleDescriptionsCache = descriptions; // Cache the results
 
-        Object.entries(descriptions).forEach(([key, value]: [string, any]) => {
-            const container = visualContainers[key as keyof typeof visualContainers];
-            if (container) {
+        Object.keys(descriptions).forEach(style => {
+            const container = visualContainers[style as keyof typeof visualContainers];
+            const data = descriptions[style as keyof typeof descriptions];
+            if (container && data) {
                 container.innerHTML = `
-                    <p class="style-visual-description">${value.description}</p>
-                    <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${value.key_elements}</div>
+                    <div class="style-visual-description">${data.description}</div>
+                    <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${data.key_elements}</div>
                 `;
             }
         });
 
     } catch (error) {
-        console.error("Error generating style example prompts:", error);
-        // Fallback to detailed static text if API fails
-        const fallbackData = {
-            cinematic: { description: "High contrast, dramatic lighting, and film grain.", key_elements: "Shallow depth of field, anamorphic lens flare, moody color grading" },
-            anime: { description: "Vibrant colors, cel-shaded characters, and dynamic lines.", key_elements: "Bold outlines, expressive faces, speed lines, detailed backgrounds" },
-            photorealistic: { description: "Lifelike textures, accurate lighting, and realistic detail.", key_elements: "Natural lighting, ray-traced reflections, complex materials, physics-based motion" },
-            abstract: { description: "Geometric shapes, bold color fields, and non-representational forms.", key_elements: "Textural overlays, fluid motion, particle systems, symbolic imagery" }
-        };
-        styleDescriptionsCache = fallbackData; // Cache fallback data
-
-        Object.entries(fallbackData).forEach(([key, value]) => {
-            const container = visualContainers[key as keyof typeof visualContainers];
+        console.error("Error generating style visuals:", error);
+        Object.values(visualContainers).forEach(container => {
             if (container) {
-                 container.innerHTML = `
-                    <p class="style-visual-description">${value.description}</p>
-                    <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${value.key_elements}</div>
-                `;
+                container.innerHTML = `<div class="placeholder-text error" style="font-size: 0.8em; color: #ff8a80;"><i class="fas fa-exclamation-triangle"></i> Failed to load</div>`;
             }
         });
     }
 }
 
-
-// 5. Core logic functions
-
-/** Handles the prompt generation from text */
-async function handleGeneratePrompt() {
-    const basicPrompt = promptInput.value.trim();
-    const negativePrompt = negativePromptInput.value.trim();
-
-    if (!basicPrompt) {
-        alert('Please enter a video idea first.');
-        return;
-    }
-
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing...';
-    resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Generating your enhanced prompt...</div>';
-    if (viewfinderDisplay && viewfinderControls) {
-        viewfinderDisplay.innerHTML = '<div class="placeholder">Generate an enhanced prompt to activate the viewfinder.</div>';
-        viewfinderControls.style.display = 'none';
-    }
-    if (catalystsContainer) {
-        catalystsContainer.innerHTML = '<div class="placeholder">Generate an enhanced prompt to see dynamic suggestions.</div>';
-        catalystsContainer.classList.add('placeholder');
-    }
-    generateVideoBtn.disabled = true;
-    currentEnhancedPrompt = null;
-
-    const systemInstruction = "You are an expert AI Video Prompt Engineer. Your task is to expand a simple user idea into a comprehensive, detailed, and structured JSON prompt for a text-to-video AI model like Google Veo. When a style preset is provided with detailed visual characteristics, it is crucial that you use this information to heavily influence all relevant fields of the JSON output, especially 'lighting', 'color_grading', and 'cinematography', to create a cohesive result that perfectly matches the requested style. Break down the user's prompt into a rich scene description, including meta data, scene details, cinematography, lighting, and technical specifications. Crucially, for the 'cinematography' section, you must use specific and professional cinematic terms. For 'shot_sequence', provide an array of objects, each defining a 'shot_type' (e.g., 'Establishing Shot', 'Wide Shot', 'Close-up', 'Low-Angle Shot') and a 'description' of what happens in that shot. For 'camera_movement', suggest techniques like 'crane shot', 'dolly zoom', 'whip pan', 'tracking shot', or 'handheld shaky effect' to match the mood and action of the scene. If the user provides exclusion criteria, populate the `meta.negative_prompt` field with a summary of these exclusions and ensure the rest of the generated prompt avoids these concepts. If no exclusions are given, set `meta.negative_prompt` to \"none\". Follow the provided JSON schema precisely. Ensure the output is only the raw JSON object, without any markdown formatting or explanations.";
-    
-    let finalPrompt = `User idea: "${basicPrompt}"`;
-    
-    if (selectedStylePreset && styleDescriptionsCache) {
-        const styleKey = selectedStylePreset.toLowerCase();
-        const styleDetails = styleDescriptionsCache[styleKey];
-        if (styleDetails) {
-            const styleContext = `
----
-STYLE CONTEXT TO APPLY:
-- Style Name: "${selectedStylePreset}"
-- Description: "${styleDetails.description}"
-- Key Visual Elements to incorporate: "${styleDetails.key_elements}"
----
-`;
-            finalPrompt = `${styleContext}\n\n${finalPrompt}`;
-        } else {
-            // Fallback if cache is not populated correctly
-            finalPrompt = `Apply the following style preset: "${selectedStylePreset}".\n\n${finalPrompt}`;
-        }
-    }
-
-    if (negativePrompt) {
-        finalPrompt += `\n\nExclusion Criteria (things to avoid): "${negativePrompt}"`;
-    }
-
-    try {
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: finalPrompt,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: videoPromptSchema,
-            },
-        });
-        
-        const enhancedPromptJson = JSON.parse(response.text);
-        displayEnhancedPrompt(enhancedPromptJson);
-
-    } catch (error) {
-        console.error('Error generating prompt:', error);
-        resultsContainer.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Sorry, something went wrong. Please try again.</div>`;
-    } finally {
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-magic"></i> Enhance Prompt (10X)';
-    }
-}
-
-/** Handles image file selection and preview */
-function handleImageUpload(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-
-    if (file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Please select an image file.');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const result = e.target?.result as string;
-            imagePreview.src = result;
-            imagePreview.style.display = 'block';
-            imagePlaceholder.style.display = 'none';
-            analyzeImageBtn.disabled = false;
-
-            // Store base64 data
-            const [header, base64] = result.split(',');
-            uploadedImageBase64 = {
-                mimeType: file.type,
-                data: base64
-            };
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-/** Handles prompt generation from an image */
-async function handleAnalyzeImage() {
-    if (!uploadedImageBase64) {
-        alert('Please upload an image first.');
-        return;
-    }
-
-    analyzeImageBtn.disabled = true;
-    analyzeImageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
-    resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing image and generating prompts...</div>';
-
-    const imagePart = {
-        inlineData: uploadedImageBase64
-    };
-
-    const textPart = {
-        text: `Analyze this image in detail. First, provide a thorough analysis including an overall description, a list of dominant colors, identified objects/elements, and the composition style. Then, based on this analysis, generate 3 distinct and creative video prompt suggestions. The final output must be a single JSON object that strictly follows the provided schema.`
-    };
-
-    try {
-        const response = await ai.models.generateContent({
-            model: chatModel, // Flash model is great for multimodal tasks
-            contents: { parts: [imagePart, textPart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: imageAnalysisSchema,
-            },
-        });
-        
-        const analysisResults = JSON.parse(response.text);
-        displayImageAnalysisResults(analysisResults);
-    } catch (error) {
-        console.error('Error analyzing image:', error);
-        resultsContainer.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Sorry, failed to analyze the image. Please try a different one.</div>`;
-    } finally {
-        analyzeImageBtn.disabled = false;
-        analyzeImageBtn.innerHTML = '<i class="fas fa-cogs"></i> Analyze Image';
-    }
-}
-
-/** Summarizes the current prompt to provide context for the chat assistant */
-async function summarizePromptForChat(promptData: any): Promise<string> {
-    try {
-        const prompt = `Summarize the following detailed video prompt JSON into a short paragraph (under 80 words). This summary will be used as context for a chat assistant helping a user refine the prompt. Focus on the core concepts: the subject, setting, style, and key actions or cinematic elements.
-
-JSON Prompt:
-${JSON.stringify(promptData, null, 2)}`;
-
-        const response = await ai.models.generateContent({
-            model: chatModel, // Use the faster model for summarization
-            contents: prompt,
-        });
-
-        return response.text.trim();
-    } catch (error) {
-        console.error('Error summarizing prompt for chat:', error);
-        // Fallback to a simpler, structured summary if API fails
-        return `A video about "${promptData.scene?.subject}" in a "${promptData.scene?.setting}" setting, with a "${promptData.meta?.style}" style. Key cinematography includes ${promptData.cinematography?.camera_movement}.`;
-    }
-}
-
-/** Handles sending a chat message */
-async function handleSendMessage() {
-    const message = chatInput.value.trim();
-    if (!message) return;
-
-    addMessage(message, 'user');
-    chatInput.value = '';
-    sendChatBtn.disabled = true;
-
-    // Add a thinking indicator
-    const thinkingMessageEl = document.createElement('div');
-    thinkingMessageEl.className = 'message bot-message thinking';
-    thinkingMessageEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    chatMessagesContainer.appendChild(thinkingMessageEl);
-    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-
-    try {
-        let fullContext = `User is asking for help with a video prompt.`;
-        if (currentEnhancedPrompt) {
-            const promptSummary = await summarizePromptForChat(currentEnhancedPrompt);
-            fullContext += `\n\nThey are working with a prompt summarized as: "${promptSummary}"`;
-        }
-        
-        const response = await chat.sendMessage({ message: `${fullContext}\n\nUser's question: "${message}"` });
-        
-        thinkingMessageEl.remove(); // Remove thinking indicator
-        addMessage(response.text, 'bot');
-
-    } catch (error) {
-        console.error('Chat error:', error);
-        thinkingMessageEl.remove(); // Remove thinking indicator on error too
-        addMessage('Sorry, I had trouble connecting. Please try again.', 'bot');
-    } finally {
-        sendChatBtn.disabled = false;
-    }
-}
-
-/** Generates and plays audio from text for the chat bot */
-async function speakText(text: string, buttonElement: HTMLButtonElement) {
-    if (!outputAudioContext) {
-        console.error("AudioContext not initialized.");
-        showNotification("Audio playback is not available.");
-        return;
-    }
-
-    // Stop any currently playing audio from the assistant
-    if (currentlyPlayingSource) {
-        currentlyPlayingSource.stop();
-        currentlyPlayingSource.disconnect();
-        currentlyPlayingSource = null;
-        // Also reset any other 'playing' buttons
-        document.querySelectorAll('.speak-btn.playing').forEach(btn => {
-            btn.classList.remove('playing');
-            btn.innerHTML = '<i class="fas fa-volume-up"></i>';
-        });
-    }
-    
-    buttonElement.disabled = true;
-    buttonElement.classList.add('playing');
-    buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-    try {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-preview-tts",
-          contents: [{ parts: [{ text: `Speak in a friendly, helpful tone: ${text}` }] }],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: 'Kore' },
-                },
-            },
-          },
-        });
-
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) {
-            throw new Error("No audio data received from API.");
-        }
-
-        const audioBytes = decode(base64Audio);
-        const audioBuffer = await decodeAudioData(audioBytes, outputAudioContext, 24000, 1);
-        
-        const source = outputAudioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(outputAudioContext.destination);
-        
-        source.onended = () => {
-            buttonElement.disabled = false;
-            buttonElement.classList.remove('playing');
-            buttonElement.innerHTML = '<i class="fas fa-volume-up"></i>';
-            currentlyPlayingSource = null;
-        };
-
-        source.start();
-        currentlyPlayingSource = source;
-
-    } catch (error) {
-        console.error("Error generating or playing speech:", error);
-        showNotification("Sorry, could not play audio.");
-        buttonElement.disabled = false;
-        buttonElement.classList.remove('playing');
-        buttonElement.innerHTML = '<i class="fas fa-volume-up"></i>';
-    }
-}
-
-
-/** Simulates video generation */
-function handleGenerateVideo() {
-    generateVideoBtn.disabled = true;
-    generateVideoBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-
-    const placeholder = videoPreview.querySelector('.placeholder');
-    if (placeholder) placeholder.textContent = 'Connecting to generation service...';
-    
-    setTimeout(() => {
-        videoPreview.innerHTML = `
-            <div class="placeholder">
-                <i class="fas fa-film" style="font-size: 48px; margin-bottom: 15px; opacity: 0.7;"></i>
-                <div>Video generation simulation complete!</div>
-                <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">In a real app, your video would appear here.</div>
-            </div>
-        `;
-        
-        generateVideoBtn.disabled = false;
-        generateVideoBtn.innerHTML = '<i class="fas fa-play-circle"></i> Generate Video';
-    }, 2500);
-}
-
-
-// 6. Scene Catalysts Logic
-/** Generates dynamic suggestions for the scene */
+/** Generates dynamic scene catalysts based on the current prompt */
 async function generateSceneCatalysts(scene: any) {
-    if (!scene) {
-        if (catalystsContainer) catalystsContainer.innerHTML = '<div class="placeholder">Scene data is missing for suggestions.</div>';
-        return;
-    }
+    if (!scene || !catalystsContainer) return;
 
     try {
-        const generationPrompt = `Based on the following video scene, generate a JSON object with creative suggestions for dynamic events. Suggest 2-3 "antagonist_actions" and 2-3 "environmental_events". These should be short, evocative phrases that could be added to the prompt to make it more exciting.
+        const prompt = `Based on the following video scene, generate 2-3 dynamic "antagonist actions" and 2-3 "environmental events" that could unexpectedly happen to increase excitement and tension. Keep each suggestion as a short, punchy, actionable phrase.
 
-Scene Subject: ${scene.subject}
-Scene Setting: ${scene.setting}
-Scene Antagonist: ${scene.antagonists || 'None'}
-Scene Environment: ${scene.environment}
+Subject: ${scene.subject}
+Setting: ${scene.setting}
+Antagonist: ${scene.antagonists || 'None'}
+Environment: ${scene.environment}
 `;
         const response = await ai.models.generateContent({
-            model: chatModel, // fast model is fine for this
-            contents: generationPrompt,
+            model: chatModel,
+            contents: prompt,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: catalystSchema,
             },
         });
-        const catalystData = JSON.parse(response.text);
-        displaySceneCatalysts(catalystData);
+        const catalysts = JSON.parse(response.text);
+        displaySceneCatalysts(catalysts);
     } catch (error) {
-        console.error('Error generating scene catalysts:', error);
-        if (catalystsContainer) {
-            catalystsContainer.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Failed to generate suggestions.</div>`;
-        }
+        console.error("Error generating scene catalysts:", error);
+        catalystsContainer.innerHTML = '<div class="placeholder" style="color: #ff8a80;">Failed to generate suggestions.</div>';
     }
 }
 
 /** Displays the generated scene catalysts in the UI */
-function displaySceneCatalysts(catalystData: any) {
+function displaySceneCatalysts(catalysts: { antagonist_actions: string[], environmental_events: string[] }) {
     if (!catalystsContainer) return;
     catalystsContainer.innerHTML = '';
     catalystsContainer.classList.remove('placeholder');
@@ -1177,160 +1059,138 @@ function displaySceneCatalysts(catalystData: any) {
     const grid = document.createElement('div');
     grid.className = 'catalysts-grid';
 
+    // Antagonist Actions Column
     const antagonistCol = document.createElement('div');
     antagonistCol.className = 'catalyst-column';
-    antagonistCol.innerHTML = `<h3><i class="fas fa-skull-crossbones"></i> Antagonist Actions</h3>`;
-
-    const environmentCol = document.createElement('div');
-    environmentCol.className = 'catalyst-column';
-    environmentCol.innerHTML = `<h3><i class="fas fa-wind"></i> Environmental Events</h3>`;
-
-    catalystData.antagonist_actions?.forEach((action: string) => {
+    antagonistCol.innerHTML = `<h3><i class="fas fa-user-secret"></i> Antagonist Actions</h3>`;
+    catalysts.antagonist_actions.forEach(action => {
         const btn = document.createElement('button');
         btn.className = 'catalyst-btn';
         btn.textContent = action;
-        btn.onclick = () => applyCatalyst(action);
+        btn.onclick = () => applyCatalyst(action, 'antagonist');
         antagonistCol.appendChild(btn);
     });
 
-    catalystData.environmental_events?.forEach((event: string) => {
+    // Environmental Events Column
+    const environmentCol = document.createElement('div');
+    environmentCol.className = 'catalyst-column';
+    environmentCol.innerHTML = `<h3><i class="fas fa-wind"></i> Environmental Events</h3>`;
+    catalysts.environmental_events.forEach(event => {
         const btn = document.createElement('button');
         btn.className = 'catalyst-btn';
         btn.textContent = event;
-        btn.onclick = () => applyCatalyst(event);
+        btn.onclick = () => applyCatalyst(event, 'environment');
         environmentCol.appendChild(btn);
     });
-    
-    if (antagonistCol.childElementCount <= 1) { // h3 is one child
-         antagonistCol.innerHTML += '<p class="no-catalyst">No specific antagonist actions suggested.</p>';
-    }
-    if (environmentCol.childElementCount <= 1) {
-         environmentCol.innerHTML += '<p class="no-catalyst">No specific environmental events suggested.</p>';
-    }
 
     grid.appendChild(antagonistCol);
     grid.appendChild(environmentCol);
     catalystsContainer.appendChild(grid);
 }
 
-/** Adds a catalyst suggestion to the main prompt input */
-function applyCatalyst(text: string) {
-    const currentPrompt = promptInput.value.trim();
-    // Appends the suggestion, adding a comma if there's existing text.
-    promptInput.value = currentPrompt ? `${currentPrompt}, ${text}` : text;
+/** Applies a catalyst to the main prompt */
+function applyCatalyst(text: string, type: 'antagonist' | 'environment') {
+    const currentPrompt = promptInput.value;
+    const addition = type === 'antagonist' ? `The antagonist ${text}.` : `Suddenly, ${text}.`;
+    promptInput.value = `${currentPrompt.trim()} ${addition}`;
     promptInput.focus();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showNotification('Suggestion added to your prompt!');
+    showNotification(`Added catalyst: "${text}"`);
 }
 
-// 7. Negative Prompt Analysis Logic
-
-/** Analyzes the negative prompt for improvements */
-async function analyzeNegativePrompt() {
-    const mainPrompt = promptInput.value.trim();
-    const negativePrompt = negativePromptInput.value.trim();
-
-    if (!negativePrompt) {
-        showNotification("Please enter something in the exclusion criteria to analyze.");
-        return;
-    }
-     if (!mainPrompt) {
-        showNotification("Please provide a main prompt for context before analyzing exclusions.");
+/** Analyzes the negative prompt for effectiveness */
+async function generateNegativePromptAnalysis() {
+    const prompt = negativePromptInput.value;
+    if (!prompt.trim()) {
+        showNotification("Negative prompt is empty.");
         return;
     }
 
-    if (!negativePromptFeedback) return;
-
-    analyzeNegativeBtn.disabled = true;
-    analyzeNegativeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     negativePromptFeedback.style.display = 'block';
     negativePromptFeedback.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing...</div>`;
-
+    
     try {
-        const generationPrompt = `You are an expert AI Video Prompt Engineer. Analyze the provided main prompt and its corresponding negative prompt (exclusion criteria). Your goal is to refine the negative prompt for better results from a text-to-video model.
+        const analysisPrompt = `Analyze the following negative prompt for an AI video generator. Provide constructive feedback on its quality and suggest a revised, more effective version. Focus on conciseness, avoiding contradictions, and using standard keywords.
 
-        1.  **Identify Weak Terms:** Find vague terms like "bad," "ugly," "low quality" and suggest specific, descriptive alternatives. For example, instead of "bad anatomy," suggest "deformed hands, extra limbs, distorted facial features."
-        2.  **Check for Contradictions:** Ensure the negative prompt doesn't accidentally contradict the main prompt's intent.
-        3.  **Anticipate Issues:** Based on the main prompt, suggest common AI artifacts to exclude. For example, if the main prompt asks for "a person walking," the negative prompt could include "unnatural gait, sliding feet."
-        4.  **Consolidate and Clarify:** Combine related ideas and make the prompt clear and concise.
+Negative Prompt: "${prompt}"`;
 
-        Return your analysis in a structured JSON format with two keys: "feedback" (a brief paragraph explaining your reasoning and suggestions) and "suggested_prompt" (the complete, improved negative prompt string).
-
-        **Main Prompt:** "${mainPrompt}"
-        **Current Negative Prompt:** "${negativePrompt}"`;
-        
         const response = await ai.models.generateContent({
             model: chatModel,
-            contents: generationPrompt,
+            contents: analysisPrompt,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: negativePromptAnalysisSchema,
             },
         });
 
-        const analysisData = JSON.parse(response.text);
-        displayNegativePromptFeedback(analysisData);
-
+        const analysis = JSON.parse(response.text);
+        displayNegativePromptAnalysis(analysis);
     } catch (error) {
         console.error("Error analyzing negative prompt:", error);
-        negativePromptFeedback.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Failed to analyze. Please try again.</div>`;
-    } finally {
-        analyzeNegativeBtn.disabled = false;
-        analyzeNegativeBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Analyze';
+        negativePromptFeedback.innerHTML = `<div class="placeholder" style="color: #ff8a80;">Analysis failed.</div>`;
     }
 }
 
-/** Displays the feedback from the negative prompt analysis */
-function displayNegativePromptFeedback(data: { feedback: string, suggested_prompt: string }) {
-    if (!negativePromptFeedback) return;
-    negativePromptFeedback.innerHTML = '';
-    negativePromptFeedback.style.display = 'block';
-
-    const feedbackParagraph = document.createElement('p');
-    feedbackParagraph.innerHTML = `<strong>Analysis:</strong> ${data.feedback}`;
-
-    const suggestionHeader = document.createElement('h4');
-    suggestionHeader.textContent = 'Suggested Improvement:';
-    suggestionHeader.style.marginTop = '10px';
-    suggestionHeader.style.marginBottom = '5px';
-
-    const suggestedPromptText = document.createElement('p');
-    suggestedPromptText.className = 'suggested-prompt-text';
-    suggestedPromptText.textContent = data.suggested_prompt;
-
-    const useBtn = document.createElement('button');
-    useBtn.className = 'action-btn';
-    useBtn.innerHTML = `<i class="fas fa-check"></i> Use Suggestion`;
-    useBtn.onclick = () => {
-        negativePromptInput.value = data.suggested_prompt;
-        showNotification('Suggested prompt applied!');
+/** Displays the negative prompt analysis */
+function displayNegativePromptAnalysis(analysis: { feedback: string, suggested_prompt: string }) {
+    negativePromptFeedback.innerHTML = `
+        <p>${analysis.feedback}</p>
+        <p><strong>Suggestion:</strong> <span class="suggested-prompt-text">"${analysis.suggested_prompt}"</span></p>
+        <button class="action-btn" id="apply-suggestion-btn"><i class="fas fa-check"></i> Apply Suggestion</button>
+    `;
+    document.getElementById('apply-suggestion-btn').onclick = () => {
+        negativePromptInput.value = analysis.suggested_prompt;
+        negativePromptFeedback.style.display = 'none';
+        showNotification("Suggested negative prompt applied!");
     };
-    
-    negativePromptFeedback.appendChild(feedbackParagraph);
-    negativePromptFeedback.appendChild(suggestionHeader);
-    negativePromptFeedback.appendChild(suggestedPromptText);
-    negativePromptFeedback.appendChild(useBtn);
 }
 
+/** Updates the list of displayed sound effects */
+function updateSFXList() {
+    sfxListContainer.innerHTML = '';
+    addedSoundEffects.forEach((sfx, index) => {
+        const item = document.createElement('div');
+        item.className = 'sfx-item';
+        item.innerHTML = `
+            <span>${sfx}</span>
+            <button class="sfx-remove-btn" data-index="${index}" title="Remove">&times;</button>
+        `;
+        sfxListContainer.appendChild(item);
+    });
 
-// 8. Saved Prompts Logic
+    // Update the main JSON prompt if it exists
+    updatePromptAndRefreshJSON('sound_design.key_effects', addedSoundEffects);
+}
 
-/** Gets all saved prompts from localStorage */
+/** Adds a sound effect to the list */
+function addSoundEffect(sfx: string) {
+    sfx = sfx.trim();
+    if (sfx && !addedSoundEffects.includes(sfx)) {
+        addedSoundEffects.push(sfx);
+        updateSFXList();
+    }
+}
+
+/** Removes a sound effect from the list */
+function removeSoundEffect(index: number) {
+    addedSoundEffects.splice(index, 1);
+    updateSFXList();
+}
+
+/** Retrieves saved prompts from local storage */
 function getSavedPrompts(): any[] {
-    const promptsJson = localStorage.getItem(SAVED_PROMPTS_KEY);
-    return promptsJson ? JSON.parse(promptsJson) : [];
+    const promptsJSON = localStorage.getItem(SAVED_PROMPTS_KEY);
+    return promptsJSON ? JSON.parse(promptsJSON) : [];
 }
 
-/** Saves an array of prompts to localStorage */
+/** Saves prompts to local storage */
 function savePrompts(prompts: any[]) {
     localStorage.setItem(SAVED_PROMPTS_KEY, JSON.stringify(prompts));
 }
 
-/** Renders the list of saved prompts in the UI */
+/** Renders the list of saved prompts */
 function renderSavedPrompts() {
     const prompts = getSavedPrompts();
-    savedPromptsContainer.innerHTML = ''; // Clear existing list
-
+    savedPromptsContainer.innerHTML = '';
     if (prompts.length === 0) {
         savedPromptsContainer.innerHTML = '<div class="placeholder">No saved prompts yet.</div>';
         return;
@@ -1340,13 +1200,13 @@ function renderSavedPrompts() {
         const item = document.createElement('div');
         item.className = 'saved-prompt-item';
         item.innerHTML = `
-            <div class="saved-prompt-info">
+            <div>
                 <div class="saved-prompt-title" title="${prompt.title}">${prompt.title}</div>
                 <div class="saved-prompt-date">${new Date(prompt.id).toLocaleString()}</div>
             </div>
             <div class="saved-prompt-actions">
-                <button class="action-btn load-btn" data-id="${prompt.id}"><i class="fas fa-folder-open"></i> Load</button>
-                <button class="action-btn delete-btn" data-id="${prompt.id}"><i class="fas fa-trash"></i> Delete</button>
+                <button class="action-btn" data-id="${prompt.id}" name="load"><i class="fas fa-folder-open"></i> Load</button>
+                <button class="action-btn" data-id="${prompt.id}" name="delete"><i class="fas fa-trash-alt"></i> Delete</button>
             </div>
         `;
         savedPromptsContainer.appendChild(item);
@@ -1354,115 +1214,399 @@ function renderSavedPrompts() {
 }
 
 /** Loads a saved prompt into the results view */
-function handleLoadPrompt(promptId: number) {
+function loadPrompt(id: number) {
     const prompts = getSavedPrompts();
-    const promptToLoad = prompts.find(p => p.id === promptId);
+    const promptToLoad = prompts.find(p => p.id === id);
     if (promptToLoad) {
         displayEnhancedPrompt(promptToLoad.data);
-        promptInput.value = ''; // Clear input as we've loaded a prompt
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        showNotification('Prompt loaded successfully!');
-    } else {
-        console.error('Could not find prompt with id:', promptId);
-        showNotification('Error: Could not load prompt.');
+        window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: 'smooth' });
+        showNotification("Prompt loaded successfully!");
     }
 }
 
-/** Deletes a prompt from localStorage */
-function handleDeletePrompt(promptId: number) {
-    if (!confirm('Are you sure you want to delete this prompt?')) {
-        return;
-    }
+/** Deletes a saved prompt */
+function deletePrompt(id: number) {
     let prompts = getSavedPrompts();
-    prompts = prompts.filter(p => p.id !== promptId);
+    prompts = prompts.filter(p => p.id !== id);
     savePrompts(prompts);
     renderSavedPrompts();
-    showNotification('Prompt deleted.');
+    showNotification("Prompt deleted.");
 }
 
 
-// 9. Event listeners & Initialization
+/** Converts text to speech and plays it */
+async function speakText(text: string, buttonElement: HTMLButtonElement) {
+    if (currentlyPlayingSource) {
+        currentlyPlayingSource.stop();
+        currentlyPlayingSource = null;
+    }
+    const allSpeakBtns = document.querySelectorAll('.speak-btn');
+    allSpeakBtns.forEach(btn => btn.classList.remove('playing'));
+
+    buttonElement.classList.add('playing');
+    buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: text }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+                },
+            },
+        });
+
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!base64Audio) throw new Error("No audio data received.");
+
+        if (!outputAudioContext) {
+            outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+
+        const audioBuffer = await decodeAudioData(decode(base64Audio), outputAudioContext, 24000, 1);
+        const source = outputAudioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(outputAudioContext.destination);
+        source.start();
+
+        currentlyPlayingSource = source;
+        source.onended = () => {
+            buttonElement.classList.remove('playing');
+            buttonElement.innerHTML = '<i class="fas fa-volume-up"></i>';
+            if (currentlyPlayingSource === source) {
+                currentlyPlayingSource = null;
+            }
+        };
+
+    } catch (error) {
+        console.error("Error generating speech:", error);
+        showNotification("Sorry, text-to-speech is unavailable.");
+        buttonElement.classList.remove('playing');
+        buttonElement.innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
+}
+
+/** Handles image file selection */
+function handleImageUpload(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const base64String = (e.target.result as string).split(',')[1];
+        uploadedImageBase64 = { mimeType: file.type, data: base64String };
+
+        imagePreview.src = e.target.result as string;
+        imagePreview.style.display = 'block';
+        imagePlaceholder.style.display = 'none';
+        analyzeImageBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+}
+
+/** Generates a single image frame (first or last) */
+async function generateImageFrame(type: 'first' | 'last') {
+    const promptEl = type === 'first' ? firstFramePrompt : lastFramePrompt;
+    const previewContainer = type === 'first' ? firstFramePreviewContainer : lastFramePreviewContainer;
+    const generateBtn = type === 'first' ? generateFirstFrameBtn : generateLastFrameBtn;
+    
+    const prompt = promptEl.value;
+    if (!prompt) {
+        showNotification(`Please enter a prompt for the ${type} frame.`);
+        return;
+    }
+
+    generateBtn.disabled = true;
+    previewContainer.innerHTML = `<div class="placeholder-text"><i class="fas fa-spinner fa-spin"></i><p>Generating...</p></div>`;
+
+    try {
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt,
+            config: {
+                numberOfImages: 1,
+                aspectRatio: '16:9',
+            },
+        });
+        
+        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+        if (type === 'first') {
+            firstFrameBase64 = base64ImageBytes;
+        } else {
+            lastFrameBase64 = base64ImageBytes;
+        }
+
+        previewContainer.innerHTML = `<img src="data:image/png;base64,${base64ImageBytes}" alt="${type} frame preview">`;
+
+    } catch (error) {
+        console.error(`Error generating ${type} frame:`, error);
+        previewContainer.innerHTML = `<div class="placeholder-text error" style="color: #ff8a80;"><i class="fas fa-exclamation-triangle"></i> Failed to generate</div>`;
+    } finally {
+        generateBtn.disabled = false;
+    }
+}
+
+
+// 5. Main logic and event listeners
+async function main() {
+    const textPrompt = promptInput.value.trim();
+    if (!textPrompt) {
+        alert('Please enter a prompt.');
+        return;
+    }
+
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing...';
+    resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Generating your enhanced prompt...</div>';
+    if (catalystsContainer) {
+        catalystsContainer.innerHTML = `
+            <div class="catalyst-loader">
+                <div class="spinner"></div>
+                <span>Waiting for main prompt...</span>
+            </div>
+        `;
+        catalystsContainer.classList.remove('placeholder');
+    }
+    
+    // Reset viewfinder
+    if(viewfinderDisplay) viewfinderDisplay.innerHTML = '<div class="placeholder">Waiting for prompt...</div>';
+    if(viewfinderControls) viewfinderControls.style.display = 'none';
+
+    try {
+        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt.
+
+User's Idea: "${textPrompt}"`;
+
+        if (negativePromptInput.value.trim()) {
+            generationPrompt += `\n\nNegative Prompt/Exclusions: "${negativePromptInput.value.trim()}"`;
+        } else {
+            generationPrompt += `\n\nNegative Prompt/Exclusions: "none"`;
+        }
+
+        if (selectedStylePreset) {
+            generationPrompt += `\n\nOverall Style: The video must have a strong "${selectedStylePreset}" aesthetic.`;
+        }
+
+        if (addedSoundEffects.length > 0) {
+            generationPrompt += `\n\nMandatory Sound Effects: Ensure these sound effects are included: ${addedSoundEffects.join(', ')}.`;
+        }
+
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: generationPrompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: videoPromptSchema,
+            },
+        });
+        
+        const enhancedPrompt = JSON.parse(response.text);
+        displayEnhancedPrompt(enhancedPrompt);
+
+    } catch (error) {
+        console.error('Error generating prompt:', error);
+        resultsContainer.innerHTML = '<div class="placeholder" style="color: #ff8a80;">An error occurred. Please try again.</div>';
+    } finally {
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-magic"></i> Enhance Prompt (10X)';
+    }
+}
+
+async function analyzeImage() {
+    if (!uploadedImageBase64) {
+        alert('Please upload an image first.');
+        return;
+    }
+
+    analyzeImageBtn.disabled = true;
+    analyzeImageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    resultsContainer.innerHTML = '<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing image, this might take a moment...</div>';
+
+    try {
+        const response = await ai.models.generateContent({
+            model: chatModel, // Use a multimodal model for image analysis
+            contents: {
+                parts: [
+                    { inlineData: uploadedImageBase64 },
+                    { text: "Analyze this image in detail and suggest 3 creative video prompt ideas based on its content. The output must be a valid JSON object." }
+                ],
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: imageAnalysisSchema,
+            },
+        });
+
+        const analysisResults = JSON.parse(response.text);
+        displayImageAnalysisResults(analysisResults);
+
+    } catch (error) {
+        console.error('Error analyzing image:', error);
+        resultsContainer.innerHTML = '<div class="placeholder" style="color: #ff8a80;">An error occurred during image analysis. Please try again.</div>';
+    } finally {
+        analyzeImageBtn.disabled = false;
+        analyzeImageBtn.innerHTML = '<i class="fas fa-cogs"></i> Analyze Image';
+    }
+}
+
+
+async function startChat() {
+    const userInput = chatInput.value.trim();
+    if (!userInput) return;
+
+    addMessage(userInput, 'user');
+    chatInput.value = '';
+    sendChatBtn.disabled = true;
+
+    // Thinking indicator
+    const thinkingMessage = document.createElement('div');
+    thinkingMessage.className = 'message bot-message thinking';
+    thinkingMessage.innerHTML = '<span><i class="fas fa-spinner fa-spin"></i></span>';
+    chatMessagesContainer.appendChild(thinkingMessage);
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+
+    try {
+        let response;
+        if (currentEnhancedPrompt) {
+            // Provide context if a prompt is available
+            const context = `The user is working on a video prompt. Here is the current JSON data for it:\n\n${JSON.stringify(currentEnhancedPrompt, null, 2)}\n\nNow, answer the user's question: "${userInput}"`;
+            response = await chat.sendMessage({ message: context });
+        } else {
+            response = await chat.sendMessage({ message: userInput });
+        }
+
+        chatMessagesContainer.removeChild(thinkingMessage); // Remove thinking indicator
+        addMessage(response.text, 'bot');
+    } catch (error) {
+        console.error('Chat error:', error);
+        chatMessagesContainer.removeChild(thinkingMessage);
+        addMessage('Sorry, I encountered an error. Please try again.', 'bot');
+    } finally {
+        sendChatBtn.disabled = false;
+    }
+}
+
+
 function init() {
-    // Initialize AudioContext for TTS
-    // Use `any` for webkitAudioContext to support older Safari versions
-    outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-
-
-    generateBtn.addEventListener('click', handleGeneratePrompt);
-    sendChatBtn.addEventListener('click', handleSendMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            handleSendMessage();
+    chat = ai.chats.create({ model: chatModel });
+    
+    // Event listeners
+    generateBtn.onclick = main;
+    promptInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            main();
         }
     });
-    generateVideoBtn.addEventListener('click', handleGenerateVideo);
-    imageUploadInput.addEventListener('change', handleImageUpload);
-    analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
-    analyzeNegativeBtn.addEventListener('click', analyzeNegativePrompt);
 
-    // Viewfinder control listeners
+    imageUploadInput.onchange = handleImageUpload;
+    analyzeImageBtn.onclick = analyzeImage;
+    
+    sendChatBtn.onclick = startChat;
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            startChat();
+        }
+    });
+
+    // Viewfinder listeners
     zoomSlider.addEventListener('input', applyViewfinderTransforms);
     panSlider.addEventListener('input', applyViewfinderTransforms);
-    tiltSlider.addEventListener('input', applyViewfinderTransforms); // Visual transform
-    tiltSlider.addEventListener('change', handleTiltContentUpdate); // AI content update
+    tiltSlider.addEventListener('input', applyViewfinderTransforms);
+    tiltSlider.addEventListener('change', handleTiltContentUpdate); // API call on release
 
+    // Style Preset listeners
+    stylePresetsContainer.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const button = target.closest('.style-preset-btn');
+        if (!button) return;
 
-    // Saved prompts event delegation
+        const style = (button as HTMLElement).dataset.style;
+        const card = button.closest('.style-preset-card');
+
+        // Toggle selection
+        if (card.classList.contains('active')) {
+            card.classList.remove('active');
+            selectedStylePreset = null;
+        } else {
+            stylePresetsContainer.querySelectorAll('.style-preset-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            selectedStylePreset = style;
+        }
+    });
+
+    // Negative Prompt Analysis listener
+    analyzeNegativeBtn.onclick = generateNegativePromptAnalysis;
+
+    // SFX listeners
+    sfxAddBtn.onclick = () => {
+        addSoundEffect(sfxCustomInput.value);
+        sfxCustomInput.value = '';
+    };
+    sfxCustomInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            addSoundEffect(sfxCustomInput.value);
+            sfxCustomInput.value = '';
+        }
+    });
+    sfxListContainer.addEventListener('click', (e) => {
+        const target = e.target;
+        // FIX: The original code had a TypeScript error because `e.target` is of type `EventTarget`.
+        // By checking if it's an `HTMLElement`, we can safely access `dataset`.
+        if (target instanceof HTMLElement && target.classList.contains('sfx-remove-btn')) {
+            const indexStr = target.dataset.index;
+            if (indexStr !== undefined) {
+                const index = parseInt(indexStr, 10);
+                if (!isNaN(index)) {
+                    removeSoundEffect(index);
+                }
+            }
+        }
+    });
+
+    // Saved Prompts listeners
     savedPromptsContainer.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        const loadBtn = target.closest('.load-btn');
-        const deleteBtn = target.closest('.delete-btn');
-
-        if (loadBtn) {
-            const promptId = parseInt(loadBtn.getAttribute('data-id')!, 10);
-            handleLoadPrompt(promptId);
-        }
-
-        if (deleteBtn) {
-            const promptId = parseInt(deleteBtn.getAttribute('data-id')!, 10);
-            handleDeletePrompt(promptId);
+        const button = target.closest('button');
+        if (button) {
+            const id = parseInt(button.dataset.id, 10);
+            if (button.name === 'load') {
+                loadPrompt(id);
+            } else if (button.name === 'delete') {
+                if (confirm('Are you sure you want to delete this prompt?')) {
+                    deletePrompt(id);
+                }
+            }
         }
     });
     
-    // Initialize chat
-    chat = ai.chats.create({
-        model: chatModel,
-        config: {
-            systemInstruction: 'You are a friendly and helpful AI assistant specializing in video prompt engineering. Help the user refine their ideas and understand the generated prompts.',
-        },
-    });
-
-    // Style preset button logic
-    stylePresetsContainer.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        const card = target.closest('.style-preset-card');
-        if (card) {
-            const button = card.querySelector('.style-preset-btn');
-            if (!button) return;
-
-            const style = button.getAttribute('data-style');
-            const currentActive = stylePresetsContainer.querySelector('.style-preset-card.active');
-            
-            if (currentActive) {
-                currentActive.classList.remove('active');
-            }
-            
-            if (selectedStylePreset === style) {
-                // If clicking the active one, deactivate it
-                selectedStylePreset = null;
-            } else {
-                // Activate the new one
-                card.classList.add('active');
-                selectedStylePreset = style;
-            }
+    // Frame Generation listeners
+    generateFirstFrameBtn.onclick = () => generateImageFrame('first');
+    generateLastFrameBtn.onclick = () => generateImageFrame('last');
+    useSubjectFirstBtn.onclick = () => {
+        if(currentEnhancedPrompt?.scene?.subject) {
+            firstFramePrompt.value = currentEnhancedPrompt.scene.subject;
         }
-    });
+    };
+    useSubjectLastBtn.onclick = () => {
+        if(currentEnhancedPrompt?.scene?.subject) {
+            lastFramePrompt.value = currentEnhancedPrompt.scene.subject;
+        }
+    };
 
-    // Initial render of saved prompts
+    // Initial setup
     renderSavedPrompts();
-
-    // Generate and display example prompts for styles
     generateAndDisplayExamplePrompts();
+    // Populate SFX presets
+    const sfxPresets = ['Tense cinematic music', 'Futuristic synthwave', 'Heavy footsteps on metal', 'Explosion in the distance', 'Rain and thunder', 'Glitched digital sounds'];
+    sfxPresets.forEach(preset => {
+        const btn = document.createElement('button');
+        btn.className = 'sfx-preset-btn';
+        btn.textContent = preset;
+        btn.onclick = () => addSoundEffect(preset);
+        sfxPresetsContainer.appendChild(btn);
+    });
 }
 
-init();
+document.addEventListener('DOMContentLoaded', init);
