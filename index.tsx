@@ -1588,7 +1588,13 @@ function addToHistory(userPrompt: string, enhancedPrompt: any, narrativeArc: any
         id: Date.now(),
         userPrompt: userPrompt,
         enhancedPrompt: enhancedPrompt,
-        narrativeArc: narrativeArc
+        narrativeArc: narrativeArc,
+        // --- Save a snapshot of the generation settings ---
+        negativePrompt: negativePromptInput.value.trim(),
+        narrativeArcEnabled: narrativeArcToggle.checked,
+        stylePreset: selectedStylePreset,
+        soundEffects: [...addedSoundEffects],
+        nsfwEnabled: nsfwToggle.checked
     };
     history.unshift(newHistoryItem); // Add to the top
     if (history.length > 50) { // Keep last 50 prompts
@@ -1630,7 +1636,30 @@ function loadFromHistory(id: number) {
     const history = getPromptHistory();
     const itemToLoad = history.find(p => p.id === id);
     if (itemToLoad) {
-        promptInput.value = itemToLoad.userPrompt;
+        // --- Restore the full input snapshot ---
+        promptInput.value = itemToLoad.userPrompt || '';
+        negativePromptInput.value = itemToLoad.negativePrompt || '';
+        narrativeArcToggle.checked = itemToLoad.narrativeArcEnabled || false;
+        nsfwToggle.checked = itemToLoad.nsfwEnabled || false;
+        if (nsfwDisclaimer) {
+            nsfwDisclaimer.style.display = nsfwToggle.checked ? 'block' : 'none';
+        }
+
+        // Restore sound effects
+        addedSoundEffects = itemToLoad.soundEffects || [];
+        updateSFXList();
+
+        // Restore style preset
+        selectedStylePreset = itemToLoad.stylePreset || null;
+        stylePresetsContainer.querySelectorAll('.style-preset-card').forEach(c => c.classList.remove('active'));
+        if (selectedStylePreset) {
+            const activeCard = stylePresetsContainer.querySelector(`[data-style="${selectedStylePreset}"]`)?.closest('.style-preset-card');
+            if (activeCard) {
+                activeCard.classList.add('active');
+            }
+        }
+        
+        // --- Display the results ---
         displayEnhancedPrompt(itemToLoad.enhancedPrompt, itemToLoad.narrativeArc);
         window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: 'smooth' });
         showNotification("History item loaded successfully!");
