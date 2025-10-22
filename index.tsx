@@ -19,6 +19,7 @@ const generateVideoBtn = document.getElementById('generate-video-btn') as HTMLBu
 const videoPreviewContainer = document.getElementById('video-preview-container');
 const stylePresetsContainer = document.getElementById('style-presets');
 const savedPromptsContainer = document.getElementById('saved-prompts-container');
+const promptHistoryContainer = document.getElementById('prompt-history-container');
 const searchSuggestionsContainer = document.getElementById('search-suggestions-container');
 const nsfwToggle = document.getElementById('nsfw-toggle') as HTMLInputElement;
 const nsfwDisclaimer = document.getElementById('nsfw-disclaimer');
@@ -91,6 +92,7 @@ let selectedStylePreset: string | null = null;
 let styleDescriptionsCache: any | null = null;
 let addedSoundEffects: string[] = [];
 const SAVED_PROMPTS_KEY = 'ai-video-prompts';
+const PROMPT_HISTORY_KEY = 'ai-video-prompt-history';
 let firstFrameBase64: string | null = null;
 let lastFrameBase64: string | null = null;
 let searchSuggestionTimeout: number | null = null;
@@ -1568,6 +1570,83 @@ function deletePrompt(id: number) {
 }
 
 
+/** Retrieves prompt history from local storage */
+function getPromptHistory(): any[] {
+    const historyJSON = localStorage.getItem(PROMPT_HISTORY_KEY);
+    return historyJSON ? JSON.parse(historyJSON) : [];
+}
+
+/** Saves prompt history to local storage */
+function savePromptHistory(history: any[]) {
+    localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(history));
+}
+
+/** Adds a successfully generated prompt to the history */
+function addToHistory(userPrompt: string, enhancedPrompt: any, narrativeArc: any | null) {
+    const history = getPromptHistory();
+    const newHistoryItem = {
+        id: Date.now(),
+        userPrompt: userPrompt,
+        enhancedPrompt: enhancedPrompt,
+        narrativeArc: narrativeArc
+    };
+    history.unshift(newHistoryItem); // Add to the top
+    if (history.length > 50) { // Keep last 50 prompts
+        history.pop();
+    }
+    savePromptHistory(history);
+}
+
+/** Renders the list of prompt history items */
+function renderPromptHistory() {
+    if (!promptHistoryContainer) return;
+    const history = getPromptHistory();
+    promptHistoryContainer.innerHTML = '';
+    if (history.length === 0) {
+        promptHistoryContainer.innerHTML = '<div class="placeholder">Your prompt history will appear here.</div>';
+        return;
+    }
+
+    history.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'saved-prompt-item'; // Reusing style
+        const title = item.userPrompt.length > 50 ? item.userPrompt.substring(0, 47) + '...' : item.userPrompt;
+        el.innerHTML = `
+            <div>
+                <div class="saved-prompt-title" title="${item.userPrompt}">${title}</div>
+                <div class="saved-prompt-date">${new Date(item.id).toLocaleString()}</div>
+            </div>
+            <div class="saved-prompt-actions">
+                <button class="action-btn" data-id="${item.id}" name="load-history"><i class="fas fa-folder-open"></i> Load</button>
+                <button class="action-btn" data-id="${item.id}" name="delete-history"><i class="fas fa-trash-alt"></i> Delete</button>
+            </div>
+        `;
+        promptHistoryContainer.appendChild(el);
+    });
+}
+
+/** Loads a history item into the results view */
+function loadFromHistory(id: number) {
+    const history = getPromptHistory();
+    const itemToLoad = history.find(p => p.id === id);
+    if (itemToLoad) {
+        promptInput.value = itemToLoad.userPrompt;
+        displayEnhancedPrompt(itemToLoad.enhancedPrompt, itemToLoad.narrativeArc);
+        window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: 'smooth' });
+        showNotification("History item loaded successfully!");
+    }
+}
+
+/** Deletes an item from history */
+function deleteFromHistory(id: number) {
+    let history = getPromptHistory();
+    history = history.filter(p => p.id !== id);
+    savePromptHistory(history);
+    renderPromptHistory();
+    showNotification("History item deleted.");
+}
+
+
 /** Converts text to speech and plays it */
 async function speakText(text: string, buttonElement: HTMLButtonElement) {
     if (currentlyPlayingSource) {
@@ -2032,6 +2111,10 @@ Beats:
         const enhancedPrompt = JSON.parse(response.text);
         displayEnhancedPrompt(enhancedPrompt, narrativeArcData);
 
+        // Add to history and re-render
+        addToHistory(textPrompt, enhancedPrompt, narrativeArcData);
+        renderPromptHistory();
+
     } catch (error) {
         console.error('Error generating prompt:', error);
         resultsContainer.innerHTML = '<div class="placeholder" style="color: #ff8a80;">An error occurred. Please try again.</div>';
@@ -2279,6 +2362,24 @@ async function init() {
         }
     });
     
+    // History listeners
+    if (promptHistoryContainer) {
+        promptHistoryContainer.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const button = target.closest('button');
+            if (button) {
+                const id = parseInt(button.dataset.id, 10);
+                if (button.name === 'load-history') {
+                    loadFromHistory(id);
+                } else if (button.name === 'delete-history') {
+                    if (confirm('Are you sure you want to delete this history item?')) {
+                        deleteFromHistory(id);
+                    }
+                }
+            }
+        });
+    }
+
     // Frame Generation listeners
     generateFirstFrameBtn.onclick = () => generateImageFrame('first');
     generateLastFrameBtn.onclick = () => generateImageFrame('last');
@@ -2412,7 +2513,7 @@ async function init() {
             showNotification(`Simulating video generation with ${modelDisplayName}...`);
 
             setTimeout(() => {
-                 videoPreviewContainer.innerHTML = `<div class="placeholder" style="padding: 0; height: 100%;"><p style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;">Simulation complete!</p><video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;"><source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"></video></div>`;
+                 videoPreviewContainer.innerHTML = `<div class="placeholder" style="padding: 0; height: 100%;"><p style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;">Simulation complete!</p><video controls autoplay loop style="width:100%; height:100%; border-radius:10px; object-fit: cover;"><source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"></source></video></div>`;
             }, 3000);
         }
     };
@@ -2420,6 +2521,7 @@ async function init() {
 
     // Initial setup
     renderSavedPrompts();
+    renderPromptHistory();
     generateAndDisplayExamplePrompts();
     initApiKeyCheck();
 

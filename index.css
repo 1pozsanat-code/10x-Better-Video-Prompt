@@ -863,11 +863,11 @@ button:disabled {
     opacity: 1;
 }
 
-.saved-prompts-section {
+.saved-prompts-section, .history-section {
     margin-top: 30px;
 }
 
-#saved-prompts-container {
+#saved-prompts-container, #prompt-history-container {
     max-height: 400px;
     overflow-y: auto;
     padding-right: 10px;
