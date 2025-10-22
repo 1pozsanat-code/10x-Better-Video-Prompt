@@ -1461,6 +1461,7 @@ select:focus {
 .nsfw-toggle-text-label {
     font-weight: 500;
     flex-grow: 1;
+    cursor: pointer;
 }
 
 .toggle-switch-container {
