@@ -299,9 +299,31 @@ const imageAnalysisSchema = {
                 },
                 required: ["title", "prompt"]
             }
+        },
+        creative_suggestions: {
+            type: Type.OBJECT,
+            description: "Specific creative suggestions derived from the image analysis.",
+            properties: {
+                camera_angles: {
+                    type: Type.ARRAY,
+                    description: "An array of 2-3 specific camera angle suggestions (e.g., 'Low-angle shot', 'Dutch angle').",
+                    items: { type: Type.STRING }
+                },
+                lighting_moods: {
+                    type: Type.ARRAY,
+                    description: "An array of 2-3 specific lighting mood suggestions (e.g., 'Chiaroscuro lighting', 'Golden hour glow').",
+                    items: { type: Type.STRING }
+                },
+                narrative_elements: {
+                    type: Type.ARRAY,
+                    description: "An array of 2-3 potential narrative elements or story hooks inspired by the image.",
+                    items: { type: Type.STRING }
+                }
+            },
+            required: ["camera_angles", "lighting_moods", "narrative_elements"]
         }
     },
-    required: ["analysis", "prompt_suggestions"]
+    required: ["analysis", "prompt_suggestions", "creative_suggestions"]
 };
 
 const tiltedVisualsSchema = {
@@ -888,6 +910,47 @@ function displayImageAnalysisResults(analysisData: any) {
     }
 
     analysisSection.appendChild(detailsGrid);
+    
+    // --- Creative Suggestions Section ---
+    if (analysisData.creative_suggestions) {
+        const creativeGrid = document.createElement('div');
+        creativeGrid.className = 'creative-suggestions-grid';
+
+        const createSuggestionColumn = (title: string, icon: string, suggestions: string[]) => {
+            if (!suggestions || suggestions.length === 0) return null;
+
+            const column = document.createElement('div');
+            column.className = 'suggestion-column';
+            
+            const header = document.createElement('h3');
+            header.innerHTML = `<i class="fas ${icon}"></i> ${title}`;
+            column.appendChild(header);
+
+            suggestions.forEach(suggestion => {
+                const btn = document.createElement('button');
+                btn.className = 'suggestion-item-btn';
+                btn.textContent = suggestion;
+                btn.onclick = () => {
+                    promptInput.value = (promptInput.value.trim() ? promptInput.value.trim() + ', ' : '') + suggestion;
+                    promptInput.focus();
+                    showNotification(`Added: "${suggestion}"`);
+                };
+                column.appendChild(btn);
+            });
+            return column;
+        };
+
+        const anglesCol = createSuggestionColumn('Camera Angles', 'fa-video', analysisData.creative_suggestions.camera_angles);
+        const lightingCol = createSuggestionColumn('Lighting Moods', 'fa-lightbulb', analysisData.creative_suggestions.lighting_moods);
+        const narrativeCol = createSuggestionColumn('Narrative Elements', 'fa-scroll', analysisData.creative_suggestions.narrative_elements);
+
+        if (anglesCol) creativeGrid.appendChild(anglesCol);
+        if (lightingCol) creativeGrid.appendChild(lightingCol);
+        if (narrativeCol) creativeGrid.appendChild(narrativeCol);
+
+        analysisSection.appendChild(creativeGrid);
+    }
+
     analysisCard.appendChild(analysisSection);
 
     // --- Prompt Suggestions Section ---
@@ -1279,50 +1342,6 @@ async function generateVFXSuggestions(mood: string, setting: string, container: 
     }
 }
 
-// Hardcoded descriptions for style presets to avoid rate-limiting errors.
-const styleVisualsData = {
-    cinematic: {
-        description: "Dramatic lighting, film grain, and a focus on epic storytelling.",
-        key_elements: "Shallow depth of field, anamorphic lens flares, high contrast, deliberate color grading"
-    },
-    anime: {
-        description: "Vibrant colors, expressive characters, and dynamic action sequences.",
-        key_elements: "Cel-shading, bold outlines, exaggerated physics, speed lines"
-    },
-    photorealistic: {
-        description: "Hyper-realistic textures and lighting that mimics the real world.",
-        key_elements: "Accurate reflections, ray-traced shadows, detailed textures, natural physics"
-    },
-    abstract: {
-        description: "A non-representational focus on shapes, colors, and movement.",
-        key_elements: "Geometric patterns, fluid dynamics, particle systems, surreal compositions"
-    }
-};
-
-/** Displays the hardcoded example prompts for each style preset */
-function displayStylePresetVisuals() {
-    const visualContainers: { [key: string]: HTMLElement | null } = {
-        cinematic: document.getElementById('style-visual-cinematic'),
-        anime: document.getElementById('style-visual-anime'),
-        photorealistic: document.getElementById('style-visual-photorealistic'),
-        abstract: document.getElementById('style-visual-abstract'),
-    };
-
-    const descriptions = styleVisualsData; // Use the hardcoded data
-
-    Object.keys(descriptions).forEach(style => {
-        const container = visualContainers[style as keyof typeof visualContainers];
-        const data = descriptions[style as keyof typeof descriptions];
-        if (container && data) {
-            container.innerHTML = `
-                <div class="style-visual-description">${data.description}</div>
-                <div class="style-visual-key-elements"><strong>Key Elements:</strong> ${data.key_elements}</div>
-            `;
-        }
-    });
-}
-
-
 /** Generates dynamic scene catalysts based on the current prompt */
 async function generateSceneCatalysts(scene: any) {
     if (!scene || !catalystsContainer) return;
@@ -1662,7 +1681,7 @@ function loadFromHistory(id: number) {
         selectedStylePreset = itemToLoad.stylePreset || null;
         stylePresetsContainer.querySelectorAll('.style-preset-card').forEach(c => c.classList.remove('active'));
         if (selectedStylePreset) {
-            const activeCard = stylePresetsContainer.querySelector(`[data-style="${selectedStylePreset}"]`)?.closest('.style-preset-card');
+            const activeCard = stylePresetsContainer.querySelector(`[data-style="${selectedStylePreset}"]`);
             if (activeCard) {
                 activeCard.classList.add('active');
             }
@@ -2183,10 +2202,13 @@ async function analyzeImage() {
 
     try {
         const hint = imageAnalysisHintInput.value.trim();
-        let textPrompt = "Analyze this image in detail and suggest 3 creative video prompt ideas based on its content. The output must be a valid JSON object.";
+        let textPrompt = `Analyze this image in detail. Provide a comprehensive analysis, 3 full video prompt ideas, and specific creative suggestions. The output must be a valid JSON object.
+- For the 'analysis', give a rich description, identify objects, dominant colors, and composition.
+- For 'prompt_suggestions', provide 3 complete, distinct video prompt ideas.
+- For 'creative_suggestions', provide 2-3 specific ideas for each of the following categories: 'camera_angles', 'lighting_moods', and 'narrative_elements'.`;
 
         if (hint) {
-            textPrompt += ` Use the following hint to guide the analysis and suggestions: "${hint}"`;
+            textPrompt += `\n\nUse the following user-provided hint to guide the analysis and suggestions: "${hint}"`;
         }
 
         const response = await ai.models.generateContent({
@@ -2329,11 +2351,10 @@ async function init() {
     // Style Preset listeners
     stylePresetsContainer.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        const button = target.closest('.style-preset-card');
-        if (!button) return;
+        const card = target.closest('.style-preset-card');
+        if (!card) return;
 
-        const style = (button as HTMLElement).dataset.style;
-        const card = button.closest('.style-preset-card');
+        const style = (card as HTMLElement).dataset.style;
 
         // Toggle selection
         if (card.classList.contains('active')) {
@@ -2580,7 +2601,6 @@ async function init() {
     // Initial setup
     renderSavedPrompts();
     renderPromptHistory();
-    displayStylePresetVisuals();
     initApiKeyCheck();
 
     // Populate SFX presets
