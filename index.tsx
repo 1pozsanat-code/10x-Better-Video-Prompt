@@ -1847,14 +1847,19 @@ async function generateImageFrame(type: 'first' | 'last') {
             },
         });
         
-        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
-        if (type === 'first') {
-            firstFrameBase64 = base64ImageBytes;
+        if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image && response.generatedImages[0].image.imageBytes) {
+            const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+            if (type === 'first') {
+                firstFrameBase64 = base64ImageBytes;
+            } else {
+                lastFrameBase64 = base64ImageBytes;
+            }
+
+            previewContainer.innerHTML = `<img src="data:image/png;base64,${base64ImageBytes}" alt="${type} frame preview">`;
         } else {
-            lastFrameBase64 = base64ImageBytes;
+            throw new Error("API response did not contain a valid image.");
         }
 
-        previewContainer.innerHTML = `<img src="data:image/png;base64,${base64ImageBytes}" alt="${type} frame preview">`;
 
     } catch (error) {
         console.error(`Error generating ${type} frame:`, error);
