@@ -1564,11 +1564,14 @@ function addVFX() {
         return;
     }
     const vfx = vfxCustomInput.value.trim();
-    if (vfx && !currentEnhancedPrompt.vfx_elements.includes(vfx)) {
-        const newVfx = [...currentEnhancedPrompt.vfx_elements, vfx];
-        updatePromptAndRefreshJSON('vfx_elements', newVfx);
-        updateVFXList();
-        vfxCustomInput.value = '';
+    if (vfx) {
+        const currentVfx = currentEnhancedPrompt.vfx_elements || [];
+        if (!currentVfx.includes(vfx)) {
+            const newVfx = [...currentVfx, vfx];
+            updatePromptAndRefreshJSON('vfx_elements', newVfx);
+            updateVFXList();
+            vfxCustomInput.value = '';
+        }
     }
 }
 
