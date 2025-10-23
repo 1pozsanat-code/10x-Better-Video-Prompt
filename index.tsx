@@ -112,6 +112,11 @@ let tiltedVisualsCache: { gritty: any | null, epic: any | null } = {
 // Audio state
 let outputAudioContext: AudioContext | null = null;
 let currentlyPlayingSource: AudioBufferSourceNode | null = null;
+let musicAudioContext: AudioContext | null = null;
+let generatedMusicBuffer: AudioBuffer | null = null;
+let musicSourceNode: AudioBufferSourceNode | null = null;
+let isMusicPlaying: boolean = false;
+
 
 // JSON schema for the enhanced prompt
 const videoPromptSchema = {
@@ -505,6 +510,15 @@ function updatePromptAndRefreshJSON(path: string, value: any) {
 function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = null) {
     resultsContainer.innerHTML = '';
     currentEnhancedPrompt = promptData;
+    
+    // Reset music state for new prompt
+    generatedMusicBuffer = null;
+    isMusicPlaying = false;
+    if (musicSourceNode) {
+        musicSourceNode.stop();
+        musicSourceNode = null;
+    }
+
 
     const promptCard = document.createElement('div');
     promptCard.className = 'prompt-card';
@@ -693,21 +707,46 @@ function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = n
     }
 
 
-    // --- Sound Effects Section ---
-    const sfxContainer = document.createElement('div');
-    sfxContainer.className = 'sound-effects-container';
+    // --- Sound Design Section ---
+    const soundDesignContainer = document.createElement('div');
+    soundDesignContainer.className = 'sound-design-container';
+    let hasSoundContent = false;
+    
     if (promptData.sound_design?.key_effects?.length > 0) {
+        hasSoundContent = true;
+        const sfxContainer = document.createElement('div');
+        sfxContainer.className = 'sound-effects-container';
         const strong = document.createElement('strong');
-        strong.innerHTML = '<i class="fas fa-volume-up"></i> Sound Design:';
+        strong.innerHTML = '<i class="fas fa-volume-up"></i> Key Sound Effects';
         sfxContainer.appendChild(strong);
+        const tagsContainer = document.createElement('div');
+        tagsContainer.className = 'sound-effects-tags';
         promptData.sound_design.key_effects.forEach((sfx: string) => {
             const sfxEl = document.createElement('span');
             sfxEl.className = 'sound-effect-tag';
             sfxEl.textContent = sfx;
-            sfxContainer.appendChild(sfxEl);
+            tagsContainer.appendChild(sfxEl);
         });
+        sfxContainer.appendChild(tagsContainer);
+        soundDesignContainer.appendChild(sfxContainer);
     }
 
+    if (promptData.sound_design?.music && promptData.sound_design.music.toLowerCase() !== 'none') {
+        hasSoundContent = true;
+        const musicContainer = document.createElement('div');
+        musicContainer.className = 'music-generation-container';
+        musicContainer.innerHTML = `
+            <strong><i class="fas fa-music"></i> Background Music</strong>
+            <p class="music-description">${promptData.sound_design.music}</p>
+            <div class="music-player" id="music-player">
+                <button class="action-btn" id="generate-music-btn">
+                    <i class="fas fa-magic"></i> Generate Ambience
+                </button>
+            </div>
+        `;
+        soundDesignContainer.appendChild(musicContainer);
+    }
+    
     // --- Tags Section ---
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'tags-container';
@@ -751,8 +790,8 @@ function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = n
     if (cinematographyContainer.hasChildNodes()) {
         promptCard.appendChild(cinematographyContainer);
     }
-    if (sfxContainer.hasChildNodes()) {
-        promptCard.appendChild(sfxContainer);
+    if (hasSoundContent) {
+        promptCard.appendChild(soundDesignContainer);
     }
     promptCard.appendChild(vfxSuggestionsContainer);
     promptCard.appendChild(tagsContainer);
@@ -776,6 +815,11 @@ function displayEnhancedPrompt(promptData: any, narrativeArcData: any | null = n
         renderSavedPrompts();
         showNotification('Prompt saved successfully!');
     };
+    
+    const generateMusicBtn = promptCard.querySelector('#generate-music-btn');
+    if (generateMusicBtn) {
+        generateMusicBtn.addEventListener('click', generateMusic);
+    }
 
 
     // --- Generate and display simple prompt ---
@@ -2308,6 +2352,99 @@ function handleModelSelectionChange() {
         // Simulation model selected
         apiKeyGate.style.display = 'none';
         generateVideoBtn.disabled = !currentEnhancedPrompt; // Enable if prompt exists
+    }
+}
+
+
+/** Generates music based on the current prompt's sound design */
+async function generateMusic() {
+    if (!currentEnhancedPrompt?.sound_design) {
+        showNotification("No sound design information available.");
+        return;
+    }
+
+    const musicPlayer = document.getElementById('music-player');
+    if (!musicPlayer) return;
+
+    musicPlayer.innerHTML = `<button class="action-btn" disabled><i class="fas fa-spinner fa-spin"></i> Generating...</button>`;
+
+    try {
+        const { music, key_effects } = currentEnhancedPrompt.sound_design;
+        const generationPrompt = `Generate a short ambient audio track that captures the following mood and elements: ${music}. If possible, subtly incorporate sounds related to these key effects: ${key_effects.join(', ')}. The output should be a soundscape or music, not speech.`;
+        
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: generationPrompt }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+            },
+        });
+
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!base64Audio) throw new Error("No audio data received from API.");
+
+        if (!musicAudioContext) {
+            musicAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+
+        generatedMusicBuffer = await decodeAudioData(decode(base64Audio), musicAudioContext, 24000, 1);
+        renderMusicPlayer();
+
+    } catch (error) {
+        console.error("Error generating music:", error);
+        showNotification("Failed to generate music.");
+        musicPlayer.innerHTML = `<button class="action-btn" id="generate-music-btn"><i class="fas fa-magic"></i> Generate Ambience</button>`;
+        const generateBtn = document.getElementById('generate-music-btn');
+        if (generateBtn) generateBtn.onclick = generateMusic;
+    }
+}
+
+/** Renders the music player controls (play/pause, regenerate) */
+function renderMusicPlayer() {
+    const musicPlayer = document.getElementById('music-player');
+    if (!musicPlayer) return;
+
+    musicPlayer.innerHTML = `
+        <button class="action-btn" id="play-music-btn" title="Play/Pause">
+            <i class="fas fa-play"></i> Play
+        </button>
+        <button class="action-btn" id="regenerate-music-btn" title="Regenerate">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    `;
+
+    document.getElementById('play-music-btn')?.addEventListener('click', toggleMusicPlayback);
+    document.getElementById('regenerate-music-btn')?.addEventListener('click', generateMusic);
+}
+
+/** Handles playing, pausing, and stopping the generated music */
+function toggleMusicPlayback() {
+    const playBtn = document.getElementById('play-music-btn');
+    if (!playBtn || !generatedMusicBuffer || !musicAudioContext) return;
+
+    if (isMusicPlaying) {
+        // Stop the music
+        if (musicSourceNode) {
+            musicSourceNode.stop();
+            musicSourceNode.onended = null; // Prevent onended from firing on manual stop
+        }
+        isMusicPlaying = false;
+        playBtn.innerHTML = `<i class="fas fa-play"></i> Play`;
+    } else {
+        // Play the music
+        musicSourceNode = musicAudioContext.createBufferSource();
+        musicSourceNode.buffer = generatedMusicBuffer;
+        musicSourceNode.connect(musicAudioContext.destination);
+        musicSourceNode.start();
+        isMusicPlaying = true;
+        playBtn.innerHTML = `<i class="fas fa-pause"></i> Pause`;
+
+        musicSourceNode.onended = () => {
+            isMusicPlaying = false;
+            playBtn.innerHTML = `<i class="fas fa-play"></i> Play`;
+            musicSourceNode = null;
+        };
     }
 }
 

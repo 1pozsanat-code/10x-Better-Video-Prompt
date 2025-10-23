@@ -360,13 +360,7 @@ button:disabled {
     margin-top: 15px;
 }
 
-.sound-effects-container {
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.tag, .sound-effect-tag {
+.tag {
     display: inline-block;
     background: rgba(255, 255, 255, 0.1);
     padding: 5px 10px;
@@ -376,12 +370,8 @@ button:disabled {
     font-size: 0.85rem;
 }
 
-.sound-effect-tag {
-    background: rgba(123, 232, 254, 0.15);
-}
-
-.sound-effects-container strong, .tags-container strong {
-    display: block;
+.tags-container strong {
+    display: inline;
     margin-bottom: 8px;
     font-weight: 500;
     color: rgba(255, 255, 255, 0.8);
@@ -1665,4 +1655,68 @@ select:focus {
 .narrative-beat-description {
     font-size: 0.9rem;
     line-height: 1.5;
+}
+
+/* --- Sound Design & Music Generation Styles --- */
+.sound-design-container {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sound-effects-container {
+    margin-bottom: 20px;
+}
+
+.sound-effects-container strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-weight: 500;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sound-effects-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.sound-effect-tag {
+    display: inline-block;
+    background: rgba(123, 232, 254, 0.15);
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.music-generation-container strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.music-description {
+    font-size: 0.9rem;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 6px;
+}
+
+.music-player {
+    display: flex;
+    gap: 10px;
+}
+
+#regenerate-music-btn {
+    padding: 8px; /* Make it more square-like */
 }
