@@ -381,13 +381,36 @@ const catalystSchema = {
     required: ["antagonist_actions", "environmental_events"]
 };
 
-const negativePromptAnalysisSchema = {
+const enhancedNegativePromptAnalysisSchema = {
     type: Type.OBJECT,
     properties: {
-        feedback: { type: Type.STRING, description: "Constructive feedback and analysis of the negative prompt." },
-        suggested_prompt: { type: Type.STRING, description: "A revised, more effective negative prompt." }
+        overall_assessment: { type: Type.STRING, description: "A brief, one-sentence overall assessment of the negative prompt's quality (e.g., 'A solid starting point with room for more specific exclusions.')." },
+        strengths: {
+            type: Type.ARRAY,
+            description: "An array of 1-2 positive aspects of the prompt. If none, return an empty array.",
+            items: { type: Type.STRING }
+        },
+        pitfalls: {
+            type: Type.ARRAY,
+            description: "An array of identified issues or pitfalls in the prompt. If none, return an empty array.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    type: { type: Type.STRING, description: "The category of the pitfall (e.g., 'Overly Broad Term', 'Contradictory Exclusion', 'Potentially Limiting', 'Redundant')." },
+                    term: { type: Type.STRING, description: "The specific word or phrase identified as problematic." },
+                    explanation: { type: Type.STRING, description: "A concise explanation of why this term is a pitfall." },
+                },
+                required: ['type', 'term', 'explanation']
+            }
+        },
+        suggested_prompt: { type: Type.STRING, description: "A revised, more effective negative prompt that addresses the identified pitfalls." },
+        additional_tips: {
+            type: Type.ARRAY,
+            description: "An array of 2-3 general, actionable tips for writing better negative prompts in the future.",
+            items: { type: Type.STRING }
+        }
     },
-    required: ["feedback", "suggested_prompt"]
+    required: ["overall_assessment", "strengths", "pitfalls", "suggested_prompt", "additional_tips"]
 };
 
 const vfxSuggestionsSchema = {
@@ -1478,7 +1501,7 @@ async function generateNegativePromptAnalysis() {
     negativePromptFeedback.innerHTML = `<div class="placeholder"><i class="fas fa-spinner fa-spin"></i> Analyzing...</div>`;
     
     try {
-        const analysisPrompt = `Analyze the following negative prompt for an AI video generator. Provide constructive feedback on its quality and suggest a revised, more effective version. Focus on conciseness, avoiding contradictions, and using standard keywords.
+        const analysisPrompt = `Perform a detailed analysis of the following negative prompt for an AI video generator. Identify strengths and common pitfalls like overly broad terms (e.g., "bad"), redundancies, or potential contradictions. Provide an overall assessment, a revised prompt, and general tips. The output must be a valid JSON object adhering to the provided schema.
 
 Negative Prompt: "${prompt}"`;
 
@@ -1487,7 +1510,7 @@ Negative Prompt: "${prompt}"`;
             contents: analysisPrompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: negativePromptAnalysisSchema,
+                responseSchema: enhancedNegativePromptAnalysisSchema,
             },
         });
 
@@ -1500,18 +1523,82 @@ Negative Prompt: "${prompt}"`;
 }
 
 /** Displays the negative prompt analysis */
-function displayNegativePromptAnalysis(analysis: { feedback: string, suggested_prompt: string }) {
+function displayNegativePromptAnalysis(analysis: any) {
+    let strengthsHtml = '';
+    if (analysis.strengths && analysis.strengths.length > 0) {
+        strengthsHtml = `
+            <div class="analysis-section">
+                <h4 class="analysis-header"><i class="fas fa-thumbs-up"></i> Strengths</h4>
+                <ul class="strengths-list">
+                    ${analysis.strengths.map((s: string) => `<li>${s}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    let pitfallsHtml = '';
+    if (analysis.pitfalls && analysis.pitfalls.length > 0) {
+        pitfallsHtml = `
+            <div class="analysis-section">
+                <h4 class="analysis-header"><i class="fas fa-exclamation-triangle"></i> Areas for Improvement</h4>
+                <div class="pitfalls-list">
+                    ${analysis.pitfalls.map((p: any) => `
+                        <div class="pitfall-item">
+                            <div class="pitfall-header">
+                                <strong>${p.type}:</strong> "${p.term}"
+                            </div>
+                            <p class="pitfall-explanation">${p.explanation}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    } else {
+         pitfallsHtml = `
+            <div class="analysis-section">
+                 <h4 class="analysis-header"><i class="fas fa-check-circle"></i> No Major Pitfalls Detected</h4>
+                 <p>Your negative prompt is clear and effective.</p>
+            </div>
+         `;
+    }
+    
+    let tipsHtml = '';
+    if (analysis.additional_tips && analysis.additional_tips.length > 0) {
+        tipsHtml = `
+             <div class="analysis-section">
+                <h4 class="analysis-header"><i class="fas fa-lightbulb"></i> Pro Tips</h4>
+                <ul class="tips-list">
+                    ${analysis.additional_tips.map((tip: string) => `<li>${tip}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
     negativePromptFeedback.innerHTML = `
-        <p>${analysis.feedback}</p>
-        <p><strong>Suggestion:</strong> <span class="suggested-prompt-text">"${analysis.suggested_prompt}"</span></p>
-        <button class="action-btn" id="apply-suggestion-btn"><i class="fas fa-check"></i> Apply Suggestion</button>
+        <div class="overall-assessment">
+            <p>${analysis.overall_assessment}</p>
+        </div>
+        ${strengthsHtml}
+        ${pitfallsHtml}
+        <div class="analysis-section">
+            <h4 class="analysis-header"><i class="fas fa-edit"></i> Suggested Revision</h4>
+            <div class="suggested-prompt-text">
+                <p>${analysis.suggested_prompt}</p>
+            </div>
+            <button class="action-btn" id="apply-suggestion-btn" style="margin-top: 15px;">
+                <i class="fas fa-check"></i> Apply Suggestion
+            </button>
+        </div>
+        ${tipsHtml}
     `;
+
     document.getElementById('apply-suggestion-btn').onclick = () => {
         negativePromptInput.value = analysis.suggested_prompt;
-        negativePromptFeedback.style.display = 'none';
+        // Optionally hide or show a confirmation
         showNotification("Suggested negative prompt applied!");
     };
 }
+
 
 /** Updates the list of displayed sound effects */
 function updateSFXList() {

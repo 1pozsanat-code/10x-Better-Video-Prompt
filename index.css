@@ -177,12 +177,13 @@ button:disabled {
     transform: none;
 }
 
+/* --- Negative Prompt Feedback Styles --- */
 .feedback-container {
     margin-top: 15px;
     padding: 15px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
-    border-left: 3px solid #e8c3d5b4;
+    border-left: 3px solid #e8c3d5;
     font-size: 0.9rem;
 }
 
@@ -195,12 +196,100 @@ button:disabled {
 }
 
 .suggested-prompt-text {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 10px;
-    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 6px;
     font-style: italic;
     color: rgba(229, 229, 229, 0.9);
+    border-left: 3px solid #e2a7e3;
 }
+
+.overall-assessment {
+    text-align: center;
+    font-style: italic;
+    color: rgba(229, 229, 229, 0.8);
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(229, 229, 229, 0.1);
+}
+
+.analysis-section {
+    margin-bottom: 20px;
+}
+
+.analysis-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: rgba(229, 229, 229, 0.85);
+}
+
+.analysis-header .fa-thumbs-up { color: #a5d6a7; }
+.analysis-header .fa-exclamation-triangle { color: #ef9a9a; }
+.analysis-header .fa-edit { color: #e8c3d5; }
+.analysis-header .fa-lightbulb { color: #ffe082; }
+
+.strengths-list, .tips-list {
+    list-style-type: none;
+    padding-left: 20px;
+}
+
+.strengths-list li, .tips-list li {
+    margin-bottom: 8px;
+    position: relative;
+}
+
+.strengths-list li::before {
+    content: '\f00c'; /* check */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    left: -20px;
+    color: #a5d6a7;
+    font-size: 0.8em;
+}
+
+.tips-list li::before {
+    content: '\f0eb'; /* lightbulb */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    left: -20px;
+    color: #ffe082;
+    font-size: 0.8em;
+}
+
+.pitfalls-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pitfall-item {
+    background: rgba(239, 154, 154, 0.1);
+    border-left: 3px solid #ef9a9a;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.pitfall-header {
+    font-weight: 500;
+    margin-bottom: 5px;
+    color: #e5e5e5;
+}
+
+.pitfall-header strong {
+    color: #ef9a9a;
+}
+
+.pitfall-explanation {
+    font-size: 0.85rem;
+    color: rgba(229, 229, 229, 0.8);
+}
+
 
 .divider {
     border: none;
