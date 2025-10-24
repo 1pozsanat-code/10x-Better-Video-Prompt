@@ -225,10 +225,10 @@ const videoPromptSchema = {
             type: Type.OBJECT,
             description: 'Technical specifications for rendering.',
             properties: {
-                resolution: { type: Type.STRING, description: 'e.g., "4K Ultra HD"' },
-                frame_rate: { type: Type.STRING, description: 'e.g., "30fps"' },
-                aspect_ratio: { type: Type.STRING, description: 'Aspect ratio (e.g., "16:9", "21:9").' },
-                color_grading: { type: Type.STRING, description: 'Post-production color style.' },
+                resolution: { type: Type.STRING, description: 'A precise resolution like "1080p Full HD", "4K Ultra HD", or "720p HD".' },
+                frame_rate: { type: Type.STRING, description: 'A precise frame rate like "24fps (Cinematic)", "30fps (Standard)", or "60fps (Smooth)".' },
+                aspect_ratio: { type: Type.STRING, description: 'A common aspect ratio like "16:9" (Widescreen), "9:16" (Vertical), or "21:9" (Cinemascope).' },
+                color_grading: { type: Type.STRING, description: 'A specific, descriptive post-production color style. Examples: "Cinematic desaturated with cool blue tones", "Warm vintage film look with high contrast", "Vibrant, high-saturation cyberpunk aesthetic with neon highlights".' },
             },
             required: ['resolution', 'frame_rate', 'aspect_ratio', 'color_grading'],
         },
@@ -2203,7 +2203,13 @@ async function main() {
 
         // Step 2: Generate the main video prompt
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing details...';
-        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt. For the 'shot_sequence', also suggest a suitable 'transition_to_next_shot' (e.g., 'Cut', 'Dissolve', 'Fade to Black') for all but the final shot. For 'technical.color_grading', suggest a specific color grading style that complements the mood and style of the video, such as 'Desaturated cool tones', 'Warm vintage look', or 'High contrast cyberpunk'.
+        let generationPrompt = `Create an advanced, professional video generation prompt based on the user's idea. The output must be a valid JSON object adhering to the provided schema. Flesh out every detail, from cinematography to lighting and sound design, to create a rich, actionable prompt.
+- For 'shot_sequence', also suggest a suitable 'transition_to_next_shot' (e.g., 'Cut', 'Dissolve', 'Fade to Black') for all but the final shot.
+- For 'technical' properties, be highly specific and descriptive:
+    - 'resolution': Use a precise value like "4K Ultra HD" or "1080p Full HD".
+    - 'frame_rate': Use a precise value like "24fps (Cinematic)" or "30fps (Standard)".
+    - 'aspect_ratio': Use a common format like "16:9" or "21:9".
+    - 'color_grading': Suggest a specific, descriptive style that complements the mood, such as 'Cinematic desaturated cool tones', 'Warm vintage look with high contrast', or 'High contrast cyberpunk'.
 
 User's Idea: "${textPrompt}"`;
 
