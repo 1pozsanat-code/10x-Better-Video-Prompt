@@ -364,12 +364,12 @@ const catalystSchema = {
     properties: {
         antagonist_actions: {
             type: Type.ARRAY,
-            description: "An array of 2-3 dynamic and engaging actions the antagonist could perform. These should be short, evocative phrases.",
+            description: "An array of 2-3 dynamic and engaging actions the antagonist could perform. These should be a short, evocative phrases.",
             items: { type: Type.STRING }
         },
         environmental_events: {
             type: Type.ARRAY,
-            description: "An array of 2-3 dynamic environmental events or effects that could occur in the scene. These should be short, evocative phrases.",
+            description: "An array of 2-3 dynamic environmental events or effects that could occur in the scene. These should be a short, evocative phrases.",
             items: { type: Type.STRING }
         }
     },
