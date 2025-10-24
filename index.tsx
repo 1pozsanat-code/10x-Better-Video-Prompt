@@ -1588,13 +1588,24 @@ function removeVFX(index: number) {
 
 /** Retrieves saved prompts from local storage */
 function getSavedPrompts(): any[] {
-    const promptsJSON = localStorage.getItem(SAVED_PROMPTS_KEY);
-    return promptsJSON ? JSON.parse(promptsJSON) : [];
+    try {
+        const promptsJSON = localStorage.getItem(SAVED_PROMPTS_KEY);
+        return promptsJSON ? JSON.parse(promptsJSON) : [];
+    } catch (error) {
+        console.error("Error reading saved prompts from localStorage:", error);
+        showNotification("Error: Could not load saved prompts.");
+        return [];
+    }
 }
 
 /** Saves prompts to local storage */
 function savePrompts(prompts: any[]) {
-    localStorage.setItem(SAVED_PROMPTS_KEY, JSON.stringify(prompts));
+    try {
+        localStorage.setItem(SAVED_PROMPTS_KEY, JSON.stringify(prompts));
+    } catch (error) {
+        console.error("Error saving prompts to localStorage:", error);
+        showNotification("Error: Could not save prompt. Storage might be full or disabled.");
+    }
 }
 
 /** Renders the list of saved prompts */
@@ -1647,13 +1658,24 @@ function deletePrompt(id: number) {
 
 /** Retrieves prompt history from local storage */
 function getPromptHistory(): any[] {
-    const historyJSON = localStorage.getItem(PROMPT_HISTORY_KEY);
-    return historyJSON ? JSON.parse(historyJSON) : [];
+    try {
+        const historyJSON = localStorage.getItem(PROMPT_HISTORY_KEY);
+        return historyJSON ? JSON.parse(historyJSON) : [];
+    } catch (error) {
+        console.error("Error reading prompt history from localStorage:", error);
+        showNotification("Error: Could not load prompt history.");
+        return [];
+    }
 }
 
 /** Saves prompt history to local storage */
 function savePromptHistory(history: any[]) {
-    localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(history));
+    try {
+        localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(history));
+    } catch (error) {
+        console.error("Error saving prompt history to localStorage:", error);
+        showNotification("Error: Could not save to history.");
+    }
 }
 
 /** Adds a successfully generated prompt to the history */
