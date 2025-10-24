@@ -86,6 +86,10 @@ const resolutionSelect = document.getElementById('resolution-select') as HTMLSel
 const frameRateSelect = document.getElementById('frame-rate-select') as HTMLSelectElement;
 const aspectRatioSelect = document.getElementById('aspect-ratio-select') as HTMLSelectElement;
 
+// Settings Management selectors
+const exportSettingsBtn = document.getElementById('export-settings-btn') as HTMLButtonElement;
+const importSettingsInput = document.getElementById('import-settings-input') as HTMLInputElement;
+
 
 // 3. State variables
 let chat: Chat;
@@ -2484,6 +2488,142 @@ function toggleMusicPlayback() {
     }
 }
 
+/** --- Settings Import/Export --- */
+
+/** Gathers all settings into a single object for export */
+function gatherAllSettings() {
+    const currentSettings = {
+        prompt: promptInput.value,
+        narrativeArc: narrativeArcToggle.checked,
+        nsfw: nsfwToggle.checked,
+        negativePrompt: negativePromptInput.value,
+        soundEffects: addedSoundEffects,
+        vfxElements: currentEnhancedPrompt?.vfx_elements || [],
+        selectedStyle: selectedStylePreset,
+        imageAnalysisHint: imageAnalysisHintInput.value,
+        firstFramePrompt: firstFramePrompt.value,
+        lastFramePrompt: lastFramePrompt.value,
+        videoModel: videoModelSelect.value,
+        aspectRatio: aspectRatioSelect.value,
+        resolution: resolutionSelect.value,
+        frameRate: frameRateSelect.value,
+    };
+    
+    const allData = {
+        version: "1.0",
+        timestamp: new Date().toISOString(),
+        savedPrompts: getSavedPrompts(),
+        promptHistory: getPromptHistory(),
+        currentSettings: currentSettings,
+        currentEnhancedPrompt: currentEnhancedPrompt
+    };
+    
+    return allData;
+}
+
+/** Exports all settings to a JSON file */
+function exportSettings() {
+    try {
+        const settings = gatherAllSettings();
+        const settingsString = JSON.stringify(settings, null, 2);
+        const blob = new Blob([settingsString], { type: 'application/json' });
+        
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        const date = new Date().toISOString().split('T')[0];
+        a.download = `10x-enhancer-settings-${date}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        showNotification("Settings exported successfully!");
+    } catch (error) {
+        console.error("Error exporting settings:", error);
+        showNotification("Error: Could not export settings.");
+    }
+}
+
+/** Handles the file import process */
+function handleImport(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    if (!confirm("This will overwrite your current settings, saved prompts, and history. Are you sure you want to continue?")) {
+        // Clear the input so the same file can be selected again
+        (event.target as HTMLInputElement).value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const text = e.target?.result as string;
+            const data = JSON.parse(text);
+            applyImportedData(data);
+        } catch (error) {
+            console.error("Error importing settings:", error);
+            showNotification("Error: Invalid or corrupted settings file.");
+        } finally {
+             // Clear the input so the same file can be selected again
+            (event.target as HTMLInputElement).value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+
+/** Applies the imported data to the application state */
+function applyImportedData(data: any) {
+    // Basic validation
+    if (data.version !== "1.0" || !data.savedPrompts || !data.promptHistory || !data.currentSettings) {
+        throw new Error("Invalid settings file structure.");
+    }
+
+    // Restore localStorage
+    savePrompts(data.savedPrompts);
+    savePromptHistory(data.promptHistory);
+
+    // Restore current settings
+    const settings = data.currentSettings;
+    promptInput.value = settings.prompt || '';
+    narrativeArcToggle.checked = settings.narrativeArc || false;
+    nsfwToggle.checked = settings.nsfw || false;
+    nsfwDisclaimer.style.display = nsfwToggle.checked ? 'block' : 'none';
+    negativePromptInput.value = settings.negativePrompt || '';
+    
+    addedSoundEffects = settings.soundEffects || [];
+    
+    selectedStylePreset = settings.selectedStyle || null;
+    
+    imageAnalysisHintInput.value = settings.imageAnalysisHint || '';
+    firstFramePrompt.value = settings.firstFramePrompt || '';
+    lastFramePrompt.value = settings.lastFramePrompt || '';
+    
+    videoModelSelect.value = settings.videoModel || 'veo-standard';
+    aspectRatioSelect.value = settings.aspectRatio || '16:9';
+    resolutionSelect.value = settings.resolution || '1080p Full HD';
+    frameRateSelect.value = settings.frameRate || '24fps';
+    
+    // Restore the main enhanced prompt if it exists
+    if (data.currentEnhancedPrompt) {
+        displayEnhancedPrompt(data.currentEnhancedPrompt, data.promptHistory?.[0]?.narrativeArc || null);
+    } else {
+        // If no enhanced prompt, just reset the results container
+        resultsContainer.innerHTML = '<div class="placeholder">Your enhanced prompts will appear here...</div>';
+    }
+
+    // Refresh UI elements
+    renderSavedPrompts();
+    renderPromptHistory();
+    updateSFXList();
+    stylePresetsContainer.querySelectorAll('.style-preset-card').forEach(c => c.classList.remove('active'));
+    if (selectedStylePreset) {
+        const activeCard = stylePresetsContainer.querySelector(`[data-style="${selectedStylePreset}"]`);
+        activeCard?.classList.add('active');
+    }
+    
+    showNotification("Settings imported successfully!");
+}
+
 
 async function init() {
     chat = ai.chats.create({ model: chatModel });
@@ -2664,6 +2804,10 @@ async function init() {
             showNotification("Could not open API key selection dialog.");
         }
     };
+
+    // Settings Management Listeners
+    exportSettingsBtn.onclick = exportSettings;
+    importSettingsInput.onchange = handleImport;
 
     generateVideoBtn.onclick = async () => {
         if (!currentEnhancedPrompt) {
