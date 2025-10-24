@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Chat, Type, Modality } from "@google/genai";
 
 // 1. Initialize the Gemini AI Model
@@ -2262,6 +2263,15 @@ Beats:
         });
         
         const enhancedPrompt = JSON.parse(response.text);
+        
+        // Manually override the style if a preset was selected to ensure consistency.
+        if (selectedStylePreset) {
+            if (!enhancedPrompt.meta) {
+                enhancedPrompt.meta = {};
+            }
+            enhancedPrompt.meta.style = selectedStylePreset;
+        }
+
         displayEnhancedPrompt(enhancedPrompt, narrativeArcData);
 
         // Add to history and re-render
