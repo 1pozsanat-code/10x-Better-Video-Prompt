@@ -2218,7 +2218,7 @@ async function main() {
 User's Idea: "${textPrompt}"`;
 
         if (narrativeArcData) {
-            generationPrompt += `\n\n**Crucially, use the following narrative arc to structure the scene and define the 'purpose' for each shot in the 'cinematography.shot_sequence'.** Each shot's purpose must directly correspond to and elaborate upon one of the provided story beats. Ensure the shot sequence follows the narrative flow logically from exposition to resolution.
+            generationPrompt += `\n\n**Crucially, use the following narrative arc to structure the scene and define the 'purpose' for each shot in the 'cinematography.shot_sequence'.** The purpose of each shot must explicitly state which story beat it represents and how it advances the narrative. For example: "Purpose: Fulfills the Exposition by introducing the lone hero against the vast, empty desert." Ensure the shot sequence follows the narrative flow logically from exposition to resolution.
 \nNarrative Arc:
 Title: ${narrativeArcData.title}
 Logline: ${narrativeArcData.logline}
@@ -2229,7 +2229,10 @@ Beats:
 - Climax: ${narrativeArcData.beats.climax}
 - Resolution: ${narrativeArcData.beats.resolution}
 `;
+        } else {
+            generationPrompt += `\n\nFor each shot in the 'shot_sequence', the 'purpose' field is critical. It must clearly state the shot's specific narrative function within the scene (e.g., "Introduce the main character's isolation", "Build suspense before the reveal", "Showcase the scale of the threat", "Climax of the action sequence"). Avoid generic purposes.`;
         }
+
 
         if (negativePromptInput.value.trim()) {
             generationPrompt += `\n\nNegative Prompt/Exclusions: "${negativePromptInput.value.trim()}"`;
