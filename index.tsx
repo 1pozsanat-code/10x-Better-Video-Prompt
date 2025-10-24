@@ -177,8 +177,8 @@ const videoPromptSchema = {
                         required: ['shot_type', 'description', 'purpose']
                     }
                 },
-                camera_movement: { type: Type.STRING, description: 'Description of camera movements. Use specific cinematic terms like "dolly zoom", "crane shot", "whip pan", "dutch angle", "steadicam", "handheld shaky cam".' },
-                framing: { type: Type.STRING, description: 'Framing and composition notes.' },
+                camera_movement: { type: Type.STRING, description: 'A detailed description of the camera\'s movement throughout the entire scene, connecting the movement style to the narrative purpose. Be highly specific and evocative. For example: "A slow, creeping dolly-in towards the subject to build suspense," or "A frantic, handheld shaky-cam to convey chaos and panic," or "A majestic crane shot that pulls back to reveal the vastness of the landscape."' },
+                framing: { type: Type.STRING, description: 'Detailed notes on shot composition and framing that enhance the narrative. Use specific techniques like "Rule of Thirds to create a balanced but dynamic composition," "Leading lines to draw the viewer\'s eye," "Symmetrical framing for a sense of order or unnatural perfection," or "Negative space to evoke feelings of isolation or anticipation."' },
                 depth_of_field: { type: Type.STRING, description: 'Notes on depth of field and focus.' },
             },
             required: ['shot_sequence', 'camera_movement', 'framing'],
