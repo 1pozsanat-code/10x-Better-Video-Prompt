@@ -1065,7 +1065,7 @@ function displayImageAnalysisResults(analysisData: any) {
 /** Generates and populates the simplified text prompt */
 async function generateSimplePrompt(promptData: any, contentElement: HTMLElement, buttonElement: HTMLButtonElement) {
     try {
-        let generationPrompt = `Based on the following detailed JSON video prompt, create a concise, human-readable, single-paragraph text prompt for an AI video generation model. Focus on the most critical visual elements, actions, atmosphere, and cinematic style. The output must be under 1000 characters and should be plain text only, without any titles, markdown, or explanations.
+        let generationPrompt = `Based on the following detailed JSON video prompt, create a concise, human-readable, single-paragraph text prompt for an AI video generation model. It is crucial to incorporate the specific camera movements described in the 'cinematography' section to ensure they are active in the final video. Focus on weaving the 'camera_movement' and key actions from the 'shot_sequence' into a cohesive narrative. Also include the most critical visual elements, actions, atmosphere, and cinematic style. The output must be under 1000 characters and should be plain text only, without any titles, markdown, or explanations.
 
 JSON Prompt:
 ${JSON.stringify(promptData, null, 2)}`;
